@@ -31,24 +31,24 @@
 ## -------------------------------------------------------------------------------------------------------------------------------------------
 
 # Define the subject list (one subject ID per row)
-subj_list=E:/100_unrelated_subjects_list.txt
+subj_list=/media/kaansocat/Elements/100_unrelated_subjects_list.txt
 
 # Count the number of subjects
-count=$(cat $subj_list | wc -l)
-
+# count=$(cat $subj_list | wc -l)
+count=100
 # HCP directory housing all subjects
-hcp_dir=E:/EIB/
+hcp_dir=/media/kaansocat/Elements/EIB/
 
 # Glasser atlas to be used
-glasser_atlas=E:/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii
+glasser_atlas=/media/kaansocat/Elements/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii
 
 for (( i=1; i<=$count; i++ ));
 do
 # Define the subject
-subj=$(cat $subj_list | head -$i | tail -1 | awk '{print $1}')
+subj=$(cat $subj_list | head -$i | tail -1 | tr -d '\r' | awk '{print $1}')
 
 # Define the output directory
-output_dir=E:/EIB/$subj
+output_dir=/media/kaansocat/Elements/EIB/$subj
 
 # Extract intracortical myelin content for each atlas-defined brain region
 wb_command -cifti-parcellate $hcp_dir/$subj/MNINonLinear/fsaverage_LR32k/${subj}.MyelinMap.32k_fs_LR.dscalar.nii $glasser_atlas COLUMN $output_dir/Glasser_myelin_content.pscalar.nii
