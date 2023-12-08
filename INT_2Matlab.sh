@@ -51,7 +51,8 @@ subj_dir=/media/kaansocat/Elements/EIB # HCP directory housing all subjects
 
 # Define the atlas directory(ies)
 # Glasser atlas to be used
-glasser_atlas=/media/kaansocat/Elements/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii
+# glasser_atlas=/media/kaansocat/Elements/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii
+glasser_atlas_dir=/media/kaansocat/Elements
 
 for (( i=1; i<=$count; i++ ));
 do
