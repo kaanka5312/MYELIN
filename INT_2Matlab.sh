@@ -37,20 +37,32 @@
 
 
 # Define subject ID
-subj=899885
+# subj=899885
+subj_list=/media/kaansocat/Elements/100_unrelated_subjects_list.txt
+
+# Count the number of subjects
+# count=$(cat $subj_list | wc -l)
+count=100
+# HCP directory housing all subjects
+hcp_dir=/media/kaansocat/Elements/EIB/
 
 # Define pertinent directories
-subj_dir=/mnt/e/EIB # HCP directory housing all subjects
+subj_dir=/media/kaansocat/Elements/EIB # HCP directory housing all subjects
+
+# Define the atlas directory(ies)
+# Glasser atlas to be used
+glasser_atlas=/media/kaansocat/Elements/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii
+
+for (( i=1; i<=$count; i++ ));
+do
+# Define the subject
+subj=$(cat $subj_list | head -$i | tail -1 | tr -d '\r' | awk '{print $1}')
 
 mni_dir=$subj_dir/$subj/MNINonLinear/Results
 
 [[ ! -e $subj_dir/$subj/INT ]] && mkdir -p $subj_dir/$subj/INT
 
 output_dir=$subj_dir/$subj/INT
-
-# Define the atlas directory(ies)
-# schaefer_atlas_dir=/cbica/home/panosf/software/Schaefer_parcellations/HCP/fslr32k/cifti
-glasser_atlas_dir=/mnt/e/
 
 echo -e "Processing subject $subj on" $(date)
 
@@ -73,5 +85,5 @@ wb_command -cifti-average $output_dir/avg_norm.dtseries.nii -cifti $output_dir/n
 # in order to come up with a <number of atlas ROIs> x <time-points> matrix
 wb_command -cifti-parcellate $output_dir/avg_norm.dtseries.nii $glasser_atlas_dir/Q1-Q6_RelatedValidation210.CorticalAreas_dil_Final_Final_Areas_Group_Colors.32k_fs_LR.dlabel.nii COLUMN $output_dir/Glasser_cortical_timeseries.ptseries.nii
 
-
+done
 
