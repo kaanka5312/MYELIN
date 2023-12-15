@@ -1,5 +1,5 @@
 % Reading each tseries file
-mainFolder = '/media/kaansocat/Elements/EIB/';
+mainFolder = '/media/kaansocat/Elements/EIB/100_Subj/';
 
 % Get the directory listing
 contents = dir(mainFolder);
@@ -35,6 +35,7 @@ save([mainFolder,folderNames{i},'/INT/INT.mat'], 'ACW0_arr' , 'ACW50_arr');
 end
 
 %%%====== AVERAGING FOR SPINNING =========
+
 
 % ACW data 
 ACW50_all = [] ;
@@ -155,9 +156,9 @@ MENT = sort([241, 214, 291, 330, 248, 212, 312, 150, 107, 267, 78]) ;
 
 
 %%
+
 % Self Regions that each group is inbetween
 CORD = load('C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/sphere_HCP.txt') ;
-
 SELF = sort([INT,EXT,MENT]) ;
 
 % Droppin one of double 78 
@@ -166,18 +167,27 @@ indexToRemove = 5;
 % Remove the element at the specified index
 SELF = SELF([1:indexToRemove-1, indexToRemove+1:end]);
 
+% Droppin one of double 291 
+indexToRemove = 27;
+
+% Remove the element at the specified index
+SELF = SELF([1:indexToRemove-1, indexToRemove+1:end]);
 % Self regions as a whole, without dividing according to layers 
 
-perm_id = rotate_parcellation(CORD(SELF(1:16),:), CORD(SELF(17:34),:), 10.000) ;
-perm_id = rotate_parcellation(CORD(INT(1:4),:), CORD(INT(5:10),:), 100.000) ;
+perm_id = rotate_parcellation(CORD(SELF(1:15),:), CORD(SELF(16:end),:), 100.000) ;
+% perm_id = rotate_parcellation(CORD(INT(1:4),:), CORD(INT(5:10),:), 100.000) ;
+
 
 % Generates p value from above 
 perm_sphere_p(mean(ACW0_all(:,SELF),1)', mean(myelin_all(:,SELF),1)', perm_id, 'spearman')
 
+
 % ACW0 content to myelin content
 % Example data
-x = AV_ACW0' ;
-y = AV_MY' ;
+% Spin permutation testing for two cortical maps
+
+x = mean(ACW0_all(:,SELF),1)' ;
+y = mean(myelin_all(:,SELF),1)' ;
 
 % See the r-value
 corr(x,y,'type','Spearman')
@@ -203,13 +213,20 @@ plot(xValues, yPred - delta, 'b--', 'HandleVisibility', 'off');
 % Customize the plot
 xlabel('ACW-0 (seconds)','FontSize',20);
 ylabel('Intracortical Myelin Content','FontSize',20);
-title('Spearman Correlation (p_{spin} < 0.001, r= -0.68)', 'FontSize', 24);
+title('Three Layer of Self (p_{spin} < 0.001, r= -0.601)', 'FontSize', 24);
 legend('show');
 grid on;
 hold off;
 
 
+%% Each Layer Respectively
 
+% Alternatively, include intersection regions to only one layer
+% Including 291 to only interoceptive
+INT = sort([108, 220, 120, 302, 286, 291, 148, 63, 258, 189]) ;
+EXT = sort([138, 82, 78, 109, 318, 145, 116, 48, 292, 20, 297, 230, 57, 249]) ;
+% Including 78 to only exteroceptive 
+MENT = sort([241, 214, 330, 248, 212, 312, 150, 107, 267]) ;
 
 % Interoceptive 
 perm_id = rotate_parcellation(CORD(INT(1:4),:), CORD(INT(5:10),:), 100.000) ;
@@ -222,11 +239,17 @@ perm_id = rotate_parcellation(CORD(EXT(1:9),:), CORD(EXT(10:14),:), 100.000) ;
 perm_sphere_p(mean(ACW0_all(:,EXT),1)', mean(myelin_all(:,EXT),1)', perm_id, 'spearman')
 
 % Mental 
-perm_id = rotate_parcellation(CORD(MENT(1:3),:), CORD(MENT(4:11),:), 100.000) ;
+% perm_id = rotate_parcellation(CORD(MENT(1:3),:), CORD(MENT(4:11),:), 100.000) ;
+% Generates p value from above 
+% perm_sphere_p(mean(ACW0_all(:,MENT),1)', mean(myelin_all(:,MENT),1)', perm_id, 'spearman')
+
+% Mental Alternative
+perm_id = rotate_parcellation(CORD(MENT(1:2),:), CORD(MENT(3:end),:), 100.000) ;
 % Generates p valie from above 
 perm_sphere_p(mean(ACW0_all(:,MENT),1)', mean(myelin_all(:,MENT),1)', perm_id, 'spearman')
 
 %%============= FIGURE OF SELF REGIONS ACW-0 to Myelin Content ============
+
 scatter(mean(ACW0_all(:,INT),1), mean(myelin_all(:,INT),1), 'filled','red','DisplayName','Interoceptive' )
 hold on 
 
@@ -243,10 +266,10 @@ scatter(mean(ACW0_all(:,EXT),1), mean(myelin_all(:,EXT),1), 'filled','blue','Dis
 % Fit a linear regression model
 lm = fitlm(mean(ACW0_all(:,EXT),1), mean(myelin_all(:,EXT),1));
 % Plot the regression line
-xValues = linspace(min(mean(ACW0_all(:,EXT),1)), max(mean(ACW0_all(:,EXT),1)), 100);
+ xValues = linspace(min(mean(ACW0_all(:,EXT),1)), max(mean(ACW0_all(:,EXT),1)), 100);
 yFit = predict(lm, xValues');
 plot(xValues, yFit, 'b-', 'LineWidth', 2, 'DisplayName', 'r_{EXT}= -0.48, p_{spin} > 0.05');
-[RHO,PVAL]=corr(mean(ACW0_all(:,EXT),1)', mean(myelin_all(:,EXT),1)','type','Spearman' ) ;
+[RHO,PVAL]=corr(mean(ACW0_all(:,EXT),1)', mean(myelin_all(:,EXT),1)','type','Spearman' ) 
 
 scatter(mean(ACW0_all(:,MENT),1), mean(myelin_all(:,MENT),1), 'filled','greed', 'DisplayName','Mental' )
 
@@ -256,22 +279,71 @@ lm = fitlm(mean(ACW0_all(:,MENT),1), mean(myelin_all(:,MENT),1));
 xValues = linspace(min(mean(ACW0_all(:,MENT),1)), max(mean(ACW0_all(:,MENT),1)), 100);
 yFit = predict(lm, xValues');
 plot(xValues, yFit, 'g-', 'LineWidth', 2, 'DisplayName', 'r_{MENT}= -0.77, p_{spin} < 0.05');
-[RHO,PVAL]=corr(mean(ACW0_all(:,MENT),1)', mean(myelin_all(:,MENT),1)','type','Spearman' );
+[RHO,PVAL]=corr(mean(ACW0_all(:,MENT),1)', mean(myelin_all(:,MENT),1)','type','Spearman' )
 
 % Customize the plot
 xlabel('ACW-0 (seconds)','FontSize',20);
 ylabel('Intracortical Myelin Content','FontSize',20);
-title('Spearman Correlation', 'FontSize', 24);
+title('Each Layer Respectively', 'FontSize', 24);
 legend('show','FontSize', 20);
 grid on;
 hold off
 
 %===================== END OF SELF THREE LAYER CORR FIGURE ================== 
+%% ACW-0
+% Example data with three groups
+group1 = reshape(ACW0_all(:,INT),1,[])';
+group2 = reshape(ACW0_all(:,EXT),1,[])';
+group3 = reshape(ACW0_all(:,MENT),1,[])';
 
+% Store data in a cell array
+data = {group1, group2, group3};
 
+% Find the maximum length among the vectors in the cell array
+maxLen = max(cellfun(@length, data));
 
+% Pad vectors with NaN to make them of equal length
+dataPadded = cellfun(@(x) [x; nan(maxLen - length(x), 1)], data, 'UniformOutput', false);
 
+% Convert the padded cell array to a matrix
+dataMatrix = cell2mat(dataPadded);
 
+% Create a boxplot
+figure;
+boxplot(dataMatrix, 'Labels', {'INT', 'EXT', 'MENT'});
+title('Boxplot of Three Groups');
+
+% Perform one-way ANOVA with unequal sample sizes
+[pValue, ~, stats] = anova1(dataMatrix, [], 'on');
+
+% Display ANOVA results
+fprintf('One-Way ANOVA p-value: %f\n', pValue);
+
+% If ANOVA is significant, perform post hoc comparisons using Bonferroni method
+if pValue < 0.05
+    comparisonResults = multcompare(stats, 'CType', 'bonferroni');
+    fprintf('Post Hoc Comparisons:\n');
+    disp(comparisonResults);
+    
+    % Compare means
+    groupMeans = grpstats(dataMatrix, ones(size(dataMatrix)), 'mean');
+    fprintf('Group Means:\n');
+    disp(groupMeans);
+
+    % Change y-axis tick labels
+    newLabels = {'MENTAL','EXT','INT'};
+    set(gca, 'YTickLabel', newLabels);
+
+    % Add title and x-axis label to the comparison figure
+    compFig = gcf;
+    compFig.Name = 'Multiple Comparison Figure';
+    title('Post Hoc Comparisons (Bonferroni corrected)');
+    xlabel('ACW-0');
+    ylabel('Three Topography of Self')
+else
+    disp('No significant difference detected.');
+end
+%% Myelin 
 % Example data with three groups
 group1 = reshape(myelin_all(:,INT),1,[])';
 group2 = reshape(myelin_all(:,EXT),1,[])';
@@ -291,7 +363,7 @@ dataMatrix = cell2mat(dataPadded);
 
 % Create a boxplot
 figure;
-boxplot(dataMatrix, 'Labels', {'Group 1', 'Group 2', 'Group 3'});
+boxplot(dataMatrix, 'Labels', {'INT', 'EXT', 'MENT'});
 title('Boxplot of Three Groups');
 
 % Perform one-way ANOVA with unequal sample sizes
@@ -310,6 +382,17 @@ if pValue < 0.05
     groupMeans = grpstats(dataMatrix, ones(size(dataMatrix)), 'mean');
     fprintf('Group Means:\n');
     disp(groupMeans);
+
+    % Change y-axis tick labels
+    newLabels = {'MENTAL','EXT','INT'};
+    set(gca, 'YTickLabel', newLabels);
+
+    % Add title and x-axis label to the comparison figure
+    compFig = gcf;
+    compFig.Name = 'Multiple Comparison Figure';
+    title('Post Hoc Comparisons (Bonferroni corrected)');
+    xlabel('Intracranial Myelin Content');
+    ylabel('Three Topography of Self')
 else
     disp('No significant difference detected.');
 end
