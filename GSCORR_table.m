@@ -18,17 +18,21 @@ end
 
 
 GSCORR_arr = zeros(360,100) ;
+
 % Each subject
 for i=1:100
-CIFTI = cifti_read([mainFolder,folderNames{i},'/INT/Glasser_cortical_timeseries.ptseries.nii']) ;
-GSCORR_arr(:,i)= GSCORR(CIFTI.cdata) ;
-
+    % Importing whole graymatter data 
+    GRAYMATTER = cifti_read([mainFolder,folderNames{i},'/INT/avg_norm.dtseries.nii']) ;
+    GS = mean(GRAYMATTER.cdata,1) ; 
+    GLASSER = cifti_read([mainFolder,folderNames{i},'/INT/Glasser_cortical_timeseries.ptseries.nii']) ;
+    GSCORR_arr(:,i) = GSCORR(GS, GLASSER.cdata) ;
 end
 % Saving each subject as a row parcellation as columns 
 
 save([mainFolder,folderNames{i},'/INT/GSCORR.mat'], 'GSCORR_arr');
 
-%%
+%% Whole Brain
+load('E:/EIB/100_Subj/GSCORR.mat')
 load('E:/EIB/INT_all.mat')
 
 AV_MY = mean(myelin_all,1) ;
@@ -41,7 +45,7 @@ perm_id = rotate_parcellation(CORD(1:180,:), CORD(181:360,:), 10.000) ;
 % Generates p valie from above 
 perm_sphere_p(AV_GSCORR, AV_MY', perm_id, 'spearman')
 
-% ACW0 content to myelin content
+% GSCORR to myelin content
 % Example data
 x = AV_GSCORR ;
 y = AV_MY' ;
@@ -53,13 +57,13 @@ y = AV_MY' ;
 lm = fitlm(x, y);
 
 % Plot the scatter plot
-scatter(x, y, 'filled', 'DisplayName', 'Data');
+scatter(x, y, 'filled', 'black', 'DisplayName', 'Data');
 hold on;
 
 % Plot the regression line
 xValues = linspace(min(x), max(x), 100);
 yFit = predict(lm, xValues');
-plot(xValues, yFit, 'r-', 'LineWidth', 2, 'DisplayName', 'Regression Line');
+plot(xValues, yFit, 'r-', 'LineWidth', 2, 'DisplayName', 'r=0.309, p_{spin} < 0.05');
 
 % Plot confidence intervals
 [yPred, delta] = predict(lm, xValues', 'Prediction', 'curve', 'Confidence', 'on');
@@ -68,12 +72,14 @@ plot(xValues, yPred + delta, 'b--', 'HandleVisibility', 'off');
 plot(xValues, yPred - delta, 'b--', 'HandleVisibility', 'off');
 
 % Customize the plot
-xlabel('ACW-0 (seconds)','FontSize',20);
+xlabel('GSCORR','FontSize',20);
 ylabel('Intracortical Myelin Content','FontSize',20);
-title('Spearman Correlation (p_{spin} < 0.001, r= -0.68)', 'FontSize', 24);
-legend('show');
+title('Spearman Correlation (p_{spin} < 0.05, r= 0.309)', 'FontSize', 24);
+legend('show', 'FontSize', 20);
 grid on;
 hold off;
+
+savefig('E:/EIB/FIGURES/Global.fig')
 %% All self regions with GSCORR 
 
 INT = sort([108, 220, 120, 302, 286, 291, 148, 63, 258, 189]) ;
@@ -99,17 +105,14 @@ indexToRemove = 27;
 SELF = SELF([1:indexToRemove-1, indexToRemove+1:end]);
 % Self regions as a whole, without dividing according to layers 
 
+% Spin permutation testing for two cortical maps
 perm_id = rotate_parcellation(CORD(SELF(1:15),:), CORD(SELF(16:end),:), 100.000) ;
 % perm_id = rotate_parcellation(CORD(INT(1:4),:), CORD(INT(5:10),:), 100.000) ;
 
 % Generates p value from above 
 perm_sphere_p(AV_GSCORR(SELF), AV_MY(SELF)', perm_id, 'spearman')
 
-
-% ACW0 content to myelin content
-% Example data
-% Spin permutation testing for two cortical maps
-
+% GSCORR to myelin content
 x = AV_GSCORR(SELF) ;
 y = AV_MY(SELF)' ;
 
@@ -135,12 +138,83 @@ plot(xValues, yPred + delta, 'b--', 'HandleVisibility', 'off');
 plot(xValues, yPred - delta, 'b--', 'HandleVisibility', 'off');
 
 % Customize the plot
-xlabel('ACW-0 (seconds)','FontSize',20);
+xlabel('GSCORR','FontSize',20);
 ylabel('Intracortical Myelin Content','FontSize',20);
-title('Three Layer of Self (p_{spin} < 0.001, r= -0.601)', 'FontSize', 24);
+title('Three Layer of Self (p_{spin} < 0.05, r=0.52)', 'FontSize', 24);
 legend('show');
 grid on;
 hold off;
+
+savefig('E:/EIB/FIGURES/Self.fig')
+
+% Non Self Regions
+NONSELF = 1:360 ;
+NONSELF = setdiff( NONSELF, SELF) ;
+
+perm_id = rotate_parcellation(CORD(NONSELF(1:165),:), CORD(NONSELF(166:end),:), 100.000) ;
+
+% Generates p value from above 
+perm_sphere_p(AV_GSCORR(NONSELF), AV_MY(NONSELF)', perm_id, 'spearman')
+
+x = AV_GSCORR(NONSELF) ;
+y = AV_MY(NONSELF)' ;
+
+% See the r-value
+corr(x,y,'type','Spearman')
+
+% Fit a linear regression model
+lm = fitlm(x, y);
+
+% Plot the scatter plot
+scatter(x, y, 'filled', 'DisplayName', 'Data');
+hold on;
+
+% Plot the regression line
+xValues = linspace(min(x), max(x), 100);
+yFit = predict(lm, xValues');
+plot(xValues, yFit, 'r-', 'LineWidth', 2, 'DisplayName', 'Regression Line');
+
+% Plot confidence intervals
+[yPred, delta] = predict(lm, xValues', 'Prediction', 'curve', 'Confidence', 'on');
+plot(xValues, yPred, 'b--', 'DisplayName', '95% Confidence Interval');
+plot(xValues, yPred + delta, 'b--', 'HandleVisibility', 'off');
+plot(xValues, yPred - delta, 'b--', 'HandleVisibility', 'off');
+
+% Customize the plot
+xlabel('GSCORR','FontSize',20);
+ylabel('Intracortical Myelin Content','FontSize',20);
+title('Non-Self (p_{spin} > 0.05, r=0.29)', 'FontSize', 24);
+legend('show');
+grid on;
+hold off;
+
+savefig('E:/EIB/FIGURES/Nonself.fig')
+
+
+h1 = openfig('E:/EIB/FIGURES/Global.fig','reuse'); % open figure
+ax1 = gca; % get handle to axes of figure
+h2 = openfig('E:/EIB/FIGURES/Self.fig','reuse'); % open figure
+ax2 = gca; % get handle to axes of figure
+h3 = openfig('E:/EIB/FIGURES/Nonself.fig','reuse');
+ax3 = gca;
+% test1.fig and test2.fig are the names of the figure files which you would % like to copy into multiple subplots
+
+h4 = figure; %create new figure
+s1 = subplot(1,3,1); %create and get handle to the subplot axes
+title('Global (p_{spin} < 0.05, r= 0.309)', 'FontSize', 16);
+ylabel('Intracortical Myelin Content','FontSize', 20)
+s2 = subplot(1,3,2); %create and get handle to the subplot axes
+title('Three Layer of Self (p_{spin} < 0.05, r=0.52)', 'FontSize', 16);
+xlabel('GSCORR', 'FontSize', 20)
+s3 = subplot(1,3,3);
+title('Non-Self (p_{spin} > 0.05, r=0.29)', 'FontSize', 16);
+fig1 = get(ax1,'children'); %get handle to all the children in the figure
+fig2 = get(ax2,'children');
+fig3 = get(ax3,'children');
+
+copyobj(fig1,s1); %copy children to new parent axes i.e. the subplot axes
+copyobj(fig2,s2);
+copyobj(fig3,s3); %copy children to new parent axes i.e. the subplot axes
 
 %% Each Layer Respectively
 
@@ -180,7 +254,7 @@ lm = fitlm( AV_GSCORR(INT), AV_MY(INT)' );
 % Plot the regression line
 xValues = linspace(min(AV_GSCORR(INT)), max(AV_GSCORR(INT)), 100);
 yFit = predict(lm, xValues');
-plot(xValues, yFit, 'r-', 'LineWidth', 2, 'DisplayName', 'r_{INT}= 0.478, p_{spin} > 0.05');
+plot(xValues, yFit, 'r-', 'LineWidth', 2, 'DisplayName', 'r_{INT}= 0.41, p_{spin} > 0.05');
 corr(AV_GSCORR(INT), AV_MY(INT)','type','Spearman' );
 
 scatter(AV_GSCORR(EXT), AV_MY(EXT)', 'filled','blue','DisplayName','Interoceptive' )
@@ -191,7 +265,7 @@ lm = fitlm( AV_GSCORR(EXT), AV_MY(EXT)' );
 % Plot the regression line
 xValues = linspace(min(AV_GSCORR(EXT)), max(AV_GSCORR(EXT)), 100);
 yFit = predict(lm, xValues');
-plot(xValues, yFit, 'b-', 'LineWidth', 2, 'DisplayName', 'r_{EXT}= 0.63, p_{spin} < 0.05');
+plot(xValues, yFit, 'b-', 'LineWidth', 2, 'DisplayName', 'r_{EXT}= 0.60, p_{spin} < 0.05');
 corr(AV_GSCORR(EXT), AV_MY(EXT)','type','Spearman' );
 
 scatter(AV_GSCORR(MENT), AV_MY(MENT)', 'filled','greed', 'DisplayName','Mental' )
@@ -201,7 +275,7 @@ lm = fitlm( AV_GSCORR(MENT), AV_MY(MENT)' );
 % Plot the regression line
 xValues = linspace(min(AV_GSCORR(MENT)), max(AV_GSCORR(MENT)), 100);
 yFit = predict(lm, xValues');
-plot(xValues, yFit, 'g-', 'LineWidth', 2, 'DisplayName', 'r_{MENT}= 0.33, p_{spin} > 0.05');
+plot(xValues, yFit, 'g-', 'LineWidth', 2, 'DisplayName', 'r_{MENT}= 0.41, p_{spin} > 0.05');
 [RHO,PVAL]=corr(AV_GSCORR(MENT), AV_MY(MENT)' ,'type','Spearman' )
 
 % Customize the plot
@@ -211,3 +285,73 @@ title('Each Layer Respectively', 'FontSize', 24);
 legend('show','FontSize', 20);
 grid on;
 hold off
+%% GSCORR comparison
+% Example data with three groups
+group1 = reshape(GSCORR_arr(INT,:),1,[])';
+group2 = reshape(GSCORR_arr(EXT,:),1,[])';
+group3 = reshape(GSCORR_arr(MENT,:),1,[])';
+
+% group1 = AV_GSCORR(INT) ;
+% group2 = AV_GSCORR(EXT) ;
+% group3 = AV_GSCORR(MENT);
+
+% Store data in a cell array
+data = {group1, group2, group3};
+
+% Find the maximum length among the vectors in the cell array
+maxLen = max(cellfun(@length, data));
+
+% Pad vectors with NaN to make them of equal length
+dataPadded = cellfun(@(x) [x; nan(maxLen - length(x), 1)], data, 'UniformOutput', false);
+
+% Convert the padded cell array to a matrix
+dataMatrix = cell2mat(dataPadded);
+
+% Create a boxplot
+figure;
+boxplot(dataMatrix, 'Labels', {'INT', 'EXT', 'MENT'});
+title('Boxplot of Three Groups');
+
+% Perform one-way ANOVA with unequal sample sizes
+[pValue, ~, stats] = anova1(dataMatrix, [], 'on');
+
+% Display ANOVA results
+fprintf('One-Way ANOVA p-value: %f\n', pValue);
+
+% If ANOVA is significant, perform post hoc comparisons using Bonferroni method
+if pValue < 0.05
+    comparisonResults = multcompare(stats, 'CType', 'bonferroni');
+    fprintf('Post Hoc Comparisons:\n');
+    disp(comparisonResults);
+    
+    % Compare means
+    groupMeans = grpstats(dataMatrix, ones(size(dataMatrix)), 'mean');
+    fprintf('Group Means:\n');
+    disp(groupMeans);
+
+    % Change y-axis tick labels
+    newLabels = {'MENTAL','EXT','INT'};
+    set(gca, 'YTickLabel', newLabels);
+
+    % Add title and x-axis label to the comparison figure
+    compFig = gcf;
+    compFig.Name = 'Multiple Comparison Figure';
+    title('Post Hoc Comparisons (Bonferroni corrected)');
+    xlabel('ACW-0');
+    ylabel('Three Topography of Self')
+else
+    disp('No significant difference detected.');
+end
+
+%% combining data for mediation investigation 
+
+MED = horzcat(AV_GSCORR, AV_ACW0', AV_MY') ;
+columnNames = {'GSCORR', 'ACW0', 'MYELIN'};
+% Convert matrix to table with column names
+% dataTable = array2table(MED, 'VariableNames', columnNames);
+
+outputArray = repmat(1, 1, 360); % Non self 
+outputArray(SELF) = 2; % Self
+MED = horzcat(MED, outputArray'); 
+
+save('E:/EIB/MED.mat','MED')
