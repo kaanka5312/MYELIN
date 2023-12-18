@@ -63,6 +63,9 @@ end
 save([mainFolder,'INT_all.mat'], 'ACW0_all', 'ACW50_all', 'myelin_all')
 
 
+%% 
+
+load('E:/EIB/INT_all.mat')
 % Spin permutation testing for two cortical maps
 AV_ACW50 = mean(ACW50_all,1) ;
 AV_ACW0 = mean(ACW0_all,1) ;
@@ -72,7 +75,7 @@ AV_MY = mean(myelin_all,1) ;
 % Git URL for the function for spin test. LATER VERIFY WITH ENIGMA TOOLBOX
 % https://github.com/frantisekvasa/rotate_parcellation.git
 % Coordinates for glasser parcellations (HCP)
-CORD = load('/home/kaansocat/Documents/MATLAB/rotate_parcellation-master/sphere_HCP.txt') ;
+CORD = load('C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/sphere_HCP.txt') ;
 perm_id = rotate_parcellation(CORD(1:180,:), CORD(181:360,:), 10.000) ;
 
 % Generates p valie from above 
@@ -90,7 +93,7 @@ corr(x,y,'type','Spearman')
 lm = fitlm(x, y);
 
 % Plot the scatter plot
-scatter(x, y, 'filled', 'DisplayName', 'Data');
+scatter(x, y, 'filled','black', 'DisplayName', 'Data');
 hold on;
 
 % Plot the regression line
@@ -107,11 +110,12 @@ plot(xValues, yPred - delta, 'b--', 'HandleVisibility', 'off');
 % Customize the plot
 xlabel('ACW-0 (seconds)','FontSize',20);
 ylabel('Intracortical Myelin Content','FontSize',20);
-title('Spearman Correlation (p_{spin} < 0.001, r= -0.68)', 'FontSize', 24);
+title('Global (p_{spin} < 0.05, r= -0.68)', 'FontSize', 24);
 legend('show');
 grid on;
 hold off;
 
+savefig('E:/EIB/FIGURES/ACW0-Global.fig')
 
 % ACW50 content to myelin content
 % Example data
@@ -148,7 +152,8 @@ grid on;
 hold off;
 
 % ============== SELF REGIONS ===============
-T = readtable('C:/Users/kaan/Downloads/Self2Glasser.csv') ;
+% Source
+%T = readtable('C:/Users/kaan/Downloads/Self2Glasser.csv') ;
 
 INT = sort([108, 220, 120, 302, 286, 291, 148, 63, 258, 189]) ;
 EXT = sort([138, 82, 78, 109, 318, 145, 116, 48, 292, 20, 297, 230, 57, 249]) ;
@@ -213,11 +218,81 @@ plot(xValues, yPred - delta, 'b--', 'HandleVisibility', 'off');
 % Customize the plot
 xlabel('ACW-0 (seconds)','FontSize',20);
 ylabel('Intracortical Myelin Content','FontSize',20);
-title('Three Layer of Self (p_{spin} < 0.001, r= -0.601)', 'FontSize', 24);
+title('Three Layer of Self (p_{spin} < 0.05, r= -0.601)', 'FontSize', 24);
 legend('show');
 grid on;
 hold off;
 
+savefig('E:/EIB/FIGURES/ACW0-Self.fig')
+
+% Non Self Regions
+NONSELF = 1:360 ;
+NONSELF = setdiff( NONSELF, SELF) ;
+
+x = mean(ACW0_all(:,NONSELF),1)' ;
+y = mean(myelin_all(:,NONSELF),1)' ;
+
+perm_id = rotate_parcellation(CORD(NONSELF(1:165),:), CORD(NONSELF(166:end),:), 100.000) ;
+
+% Generates p value from above 
+perm_sphere_p(x, y, perm_id, 'spearman')
+
+% See the r-value
+[RHO,pval]=corr(x,y,'type','Spearman')
+
+% Fit a linear regression model
+lm = fitlm(x, y);
+
+% Plot the scatter plot
+scatter(x, y, 'filled', 'DisplayName', 'Data');
+hold on;
+
+% Plot the regression line
+xValues = linspace(min(x), max(x), 100);
+yFit = predict(lm, xValues');
+plot(xValues, yFit, 'r-', 'LineWidth', 2, 'DisplayName', 'Regression Line');
+
+% Plot confidence intervals
+[yPred, delta] = predict(lm, xValues', 'Prediction', 'curve', 'Confidence', 'on');
+plot(xValues, yPred, 'b--', 'DisplayName', '95% Confidence Interval');
+plot(xValues, yPred + delta, 'b--', 'HandleVisibility', 'off');
+plot(xValues, yPred - delta, 'b--', 'HandleVisibility', 'off');
+
+% Customize the plot
+xlabel('ACW-0','FontSize',20);
+ylabel('Intracortical Myelin Content','FontSize',20);
+title('Non-Self (p_{spin} < 0.05, r=-0.68)', 'FontSize', 24);
+legend('show');
+grid on;
+hold off;
+
+savefig('E:/EIB/FIGURES/ACW0-Nonself.fig')
+
+% Combined figure
+h1 = openfig('E:/EIB/FIGURES/ACW0-Global.fig','reuse'); % open figure
+ax1 = gca; % get handle to axes of figure
+h2 = openfig('E:/EIB/FIGURES/ACW0-Self.fig','reuse'); % open figure
+ax2 = gca; % get handle to axes of figure
+h3 = openfig('E:/EIB/FIGURES/ACW0-Nonself.fig','reuse');
+ax3 = gca;
+% test1.fig and test2.fig are the names of the figure files which you would % like to copy into multiple subplots
+
+h4 = figure; %create new figure
+s1 = subplot(1,3,1); %create and get handle to the subplot axes
+title('Global (p_{spin} < 0.05, r= -0.68)', 'FontSize', 14);
+ylabel('Intracortical Myelin Content','FontSize', 20)
+s2 = subplot(1,3,2); %create and get handle to the subplot axes
+title('Three Layer of Self (p_{spin} < 0.05, r= -0.601)', 'FontSize', 14);
+xlabel('ACW-0 (Seconds)', 'FontSize', 20)
+s3 = subplot(1,3,3);
+title('Non-Self (p_{spin} < 0.05, r= -0.68)', 'FontSize', 14);
+fig1 = get(ax1,'children'); %get handle to all the children in the figure
+fig2 = get(ax2,'children');
+fig3 = get(ax3,'children');
+
+copyobj(fig1,s1); %copy children to new parent axes i.e. the subplot axes
+copyobj(fig2,s2);
+copyobj(fig3,s3); %copy children to new parent axes i.e. the subplot axes
 
 %% Each Layer Respectively
 
