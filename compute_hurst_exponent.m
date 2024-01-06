@@ -31,10 +31,16 @@
 % human cortex,” (2023) Nature Communications.
 
 % This is the same file with original repository 
-Author: Kaan Keskin, 2024
+% Author: Kaan Keskin, 2024
 % -------------------------------------------------------------------------
 
 % Add the appropriate paths
+addpath('C:\Users\kaan\Documents\MATLAB\gifti-main');
+addpath('C:\Users\kaan\Documents\MATLAB\cifti-matlab');
+addpath(genpath('C:\Users\kaan\Documents\MATLAB\wmtsa-matlab'));
+addpath(genpath('C:\Users\kaan\Documents\MATLAB\nonfractal-master\nonfractal-master'));
+
+
 addpath('/cbica/home/panosf/software/gifti');
 addpath('/cbica/home/panosf/software/cifti-matlab');
 addpath(genpath('/cbica/home/panosf/software/wmtsa-matlab-0.2.6'));
@@ -53,11 +59,12 @@ disp('Processing the HCP subjects:')
 
 % Load the HCP subject IDs: The text file below contains a subject ID per
 % row. This text file is provided by the HCP download. 
-hcp_subject_IDs = importdata('/cbica/home/panosf/HCP_Dataset/100_unrelated_subjects_list.txt');
+% hcp_subject_IDs = importdata('/cbica/home/panosf/HCP_Dataset/100_unrelated_subjects_list.txt');
+hcp_subject_IDs = importdata('E:/100_unrelated_subjects_list.txt');
 
 % Define the atlases of interest
-hcp_atlases = ["Schaefer2018_400Parcels_7Networks_order", "Glasser_cortical"];
-
+% hcp_atlases = ["Schaefer2018_400Parcels_7Networks_order", "Glasser_cortical"];
+hcp_atlases = ["Glasser_cortical"];
 for i=1:numel(hcp_subject_IDs) % loop through the subjects
     
     for a=1:numel(hcp_atlases) % loop through the atlases
@@ -66,7 +73,8 @@ for i=1:numel(hcp_subject_IDs) % loop through the subjects
         % the size of the BOLD timeseries will be <number of TRs> x <number
         % of ROIs>
         % TR is repetition time and ROIs is regions of interest
-        hcp_BOLD_timeseries{i}{a} = ciftiopen(fullfile('/cbica/home/panosf/HCP_Dataset',num2str(hcp_subject_IDs(i)),'functional_connectivity',hcp_atlases(a)+'_timeseries.ptseries.nii'),'/cbica/software/external/connectome_workbench/1.4.2/bin/wb_command');
+        % hcp_BOLD_timeseries{i}{a} = ciftiopen(fullfile('/cbica/home/panosf/HCP_Dataset',num2str(hcp_subject_IDs(i)),'functional_connectivity',hcp_atlases(a)+'_timeseries.ptseries.nii'),'/cbica/software/external/connectome_workbench/1.4.2/bin/wb_command');
+        hcp_BOLD_timeseries{i}{a} = ciftiopen(fullfile('E:/EIB/100_Subj',num2str(hcp_subject_IDs(i)),'INT',hcp_atlases(a)+'_timeseries.ptseries.nii'),'C:/Users/kaan/Documents/workbench-windows64-v1.5.0/workbench/bin_windows64/wb_command');
         
         hcp_BOLD_timeseries{i}{a} = double(hcp_BOLD_timeseries{i}{a}.cdata');
         
