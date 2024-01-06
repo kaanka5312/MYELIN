@@ -87,7 +87,7 @@ for i=1:numel(hcp_subject_IDs) % loop through the subjects
         hcp_results = hcp_H{i}{a}';
         
         % Save the results as a csv file per subject
-        writematrix(hcp_results,fullfile('/cbica/home/panosf/HCP_Dataset',num2str(hcp_subject_IDs(i)),string(hcp_subject_IDs(i))+'_'+hcp_atlases(a)+'_ei_hurst_results.csv'));        
+        writematrix(hcp_results,fullfile('E:/EIB/100_Subj',num2str(hcp_subject_IDs(i)),string(hcp_subject_IDs(i))+'_'+hcp_atlases(a)+'_ei_hurst_results.csv'));        
     end
 end
 
