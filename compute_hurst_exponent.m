@@ -30,6 +30,8 @@
 % balance synergistically shape structure-function coupling across the 
 % human cortex,” (2023) Nature Communications.
 
+% This is the same file with original repository 
+Author: Kaan Keskin, 2024
 % -------------------------------------------------------------------------
 
 % Add the appropriate paths
