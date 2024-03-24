@@ -1,3 +1,5 @@
+% This script is only important for calculating ACW from the HCP-MR files.
+% load('E:/EIB/INT_all.mat') is the main line in that. Data concaneted here will be find in DATA folder.
 % Reading each tseries file
 mainFolder = '/media/kaansocat/Elements/EIB/100_Subj/';
 
