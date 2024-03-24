@@ -1,5 +1,5 @@
 % This script produces figure 5 in myelin project. It uses functions for
-% wilcox-cowan and Balloon-Windkessel
+% Wilcox-Cowan and Balloon-Windkessel simulations.
 
 
 
