@@ -1,3 +1,6 @@
+% This script makes spin permutation test, and creates respective figures for paper
+% Author: kaanka5312
+
 % Adding toolboxes and data paths
 addpath("G:/Drive'ım/Research/Myelin_Self/")
 addpath("C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/Matlab/")
