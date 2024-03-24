@@ -1,3 +1,8 @@
+% This script is only important for it produces MED file in the end
+% save('E:/EIB/MED.mat','MED'). MED can be find in DATA folder
+
+% Author: kaanka5312
+%-----%-----%-----%-----%-----%-----%-----%-----%-----%-----
 % Reading each tseries file
 mainFolder = 'E:/EIB/100_Subj/';
 
