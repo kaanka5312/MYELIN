@@ -1,8 +1,8 @@
-% This script is only important for it produces MED file in the end
+%% This script is only important for it produces MED file in the end
 % save('E:/EIB/MED.mat','MED'). MED can be find in DATA folder
-
 % Author: kaanka5312
 %-----%-----%-----%-----%-----%-----%-----%-----%-----%-----
+
 % Reading each tseries file
 mainFolder = 'E:/EIB/100_Subj/';
 
@@ -38,17 +38,45 @@ save([mainFolder,folderNames{i},'/INT/GSCORR.mat'], 'GSCORR_arr');
 
 %% Whole Brain
 load('E:/EIB/100_Subj/GSCORR.mat')
-load('E:/EIB/INT_all.mat')
+load('E:/EIB/MATLAB_ClassificationApp/INT_all.mat')
 
 AV_MY = mean(myelin_all,1) ;
 AV_GSCORR = mean(GSCORR_arr,2) ;
 
 
 CORD = load('C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/sphere_HCP.txt') ;
-perm_id = rotate_parcellation(CORD(1:180,:), CORD(181:360,:), 10.000) ;
+perm_id = rotate_parcellation(CORD(1:180,:), CORD(181:360,:), 10000 ) ;
 
 % Generates p valie from above 
-perm_sphere_p(AV_GSCORR, AV_MY', perm_id, 'spearman')
+[p_spin, r_dist] = perm_sphere_p(AV_GSCORR, AV_MY', perm_id, 'spearman') ;
+
+% Store p-values and null distributions
+p_and_d =  cell2struct({[p_spin; r_dist]}, ...
+                       {'GSCORR_MY'}, 2);
+
+f = figure,
+    set(gcf,'color','w');
+    set(gcf,'units','normalized','position',[0 0 1 0.3])
+    fns = fieldnames(p_and_d);
+
+    for k = 1:numel(fieldnames(rvals))
+        % Define plot colors
+        if k <= 2; col = [0.66 0.13 0.11]; else; col = [0.2 0.33 0.49]; end
+
+        % Plot null distributions
+        axs = subplot(1, 4, k); hold on
+        h = histogram(p_and_d.(fns{k})(2:end), 50, 'Normalization', 'pdf', 'edgecolor', 'w', ...
+                      'facecolor', col, 'facealpha', 1, 'linewidth', 0.5);
+        l = line([rvals.(fns{k}) rvals.(fns{k})], get(gca, 'ylim'), 'linestyle', '--', ...
+                 'color', 'k', 'linewidth', 1.5);
+        xlabel(['Null correlations' newline '(' strrep(fns{k}, '_', ' ') ')'])
+        ylabel('Density')
+        legend(l,['{\it r}=' num2str(round(rvals.(fns{k}), 2)) newline ...
+                  '{\it p}=' num2str(round(p_and_d.(fns{k})(1), 3))])
+        legend boxoff
+    end
+
+
 
 % GSCORR to myelin content
 % Example data
@@ -342,7 +370,7 @@ if pValue < 0.05
     compFig = gcf;
     compFig.Name = 'Multiple Comparison Figure';
     title('Post Hoc Comparisons (Bonferroni corrected)');
-    xlabel('ACW-0');
+    xlabel('GSCORR');
     ylabel('Three Topography of Self')
 else
     disp('No significant difference detected.');
@@ -350,13 +378,29 @@ end
 
 %% combining data for mediation investigation 
 
-MED = horzcat(AV_GSCORR, AV_ACW0', AV_MY') ;
-columnNames = {'GSCORR', 'ACW0', 'MYELIN'};
+load('E:/EIB/INT_all.mat')
+% Spin permutation testing for two cortical maps
+AV_ACW50 = mean(ACW50_all,1) ;
+AV_ACW0 = mean(ACW0_all,1) ;
+AV_MY = mean(myelin_all,1) ;
+
+
+MED = horzcat(AV_GSCORR, AV_ACW0', AV_MY', AV_HURST) ;
+columnNames = {'GSCORR', 'ACW0', 'MYELIN', 'HURST'};
 % Convert matrix to table with column names
 % dataTable = array2table(MED, 'VariableNames', columnNames);
 
 outputArray = repmat(1, 1, 360); % Non self 
 outputArray(SELF) = 2; % Self
-MED = horzcat(MED, outputArray'); 
+
+outputArray_2 = repmat(1, 1, 360); % Non self 
+outputArray_2(INT) = 2; % Interoceptive
+outputArray_2(EXT) = 3; % Interoceptive
+outputArray_2(MENT) = 4; % Interoceptive
+
+MED = horzcat(MED, outputArray', outputArray_2'); 
+columnNames = {'GSCORR', 'ACW', 'Myelin','Hurst', 'Class1', 'Class2'} ;
+dataTable = array2table(MED, 'VariableNames', columnNames);
 
 save('E:/EIB/MED.mat','MED')
+save('E:/EIB/MATLAB_ClassificationApp/MED_TABLE.mat','MED')
