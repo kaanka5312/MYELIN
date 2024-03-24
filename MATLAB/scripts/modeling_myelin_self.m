@@ -1,8 +1,8 @@
 % This script produces figure 5 in myelin project. It uses functions for
 % Wilcox-Cowan and Balloon-Windkessel simulations.
+% Author: kaanka5312
 
-
-
+%----%----%----%----%----%----%----%----%----%----%----%----%----%----%----
 %% Making self regions myelin less than nonself regions
 addpath('G:Drive''ım\Research\Myelin_Self\')
 W = load('G:Drive''ım\Research\Myelin_Self\averageConnectivity_Fpt.mat'); %DTI common matrix
