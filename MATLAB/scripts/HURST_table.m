@@ -1,3 +1,6 @@
+% This script has no practical implication at the project
+% Author: kaanka5312
+%----%----%----%----%----%----%----%----%----%----%----%----%----%----
 % Reading each tseries file
 mainFolder = 'E:/EIB/100_Subj/';
 
