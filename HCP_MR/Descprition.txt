@@ -1,0 +1,1 @@
+This folder contains scripts that processes MR data until it can be processed under either MATLAB/R.
