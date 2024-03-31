@@ -1,7 +1,7 @@
 
 # -------------------- GENERATED WITH PHOTON WIZARD (beta) ------------------------------
 # PHOTON Project Folder: E:/EIB/photonai
-
+# TEST
 import pandas as pd
 import numpy as np
 from photonai.base import Hyperpipe, PipelineElement, OutputSettings, Switch, Preprocessing
@@ -41,11 +41,11 @@ y = np.asarray(df.iloc[:, 5])
 # Fit hyperpipe
 hyperpipe.fit(X, y)
 
-handler=hyperpipe.results_handler
+#handler=hyperpipe.results_handler
 
-performance_table = handler.get_performance_table()
-performance_table.to_csv('E:/EIB/DATA/performance_table.csv', index=False)
+#performance_table = handler.get_performance_table()
+#performance_table.to_csv('E:/EIB/DATA/performance_table.csv', index=False)
 
-with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-    print(performance_table)
-print(" ")
+#with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+#    print(performance_table)
+#print(" ")
