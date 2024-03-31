@@ -114,7 +114,7 @@ p_value <- result$p[1]
 # MY
 result <- RegWise %>%
   wilcox_test(MY ~ G_1) %>%
-  add_significance("p") %>%
+  add_significance("p")
 
 RegWise %>% wilcox_effsize(MY ~ G_1)
 
@@ -306,7 +306,7 @@ library(webp)
 library(gridExtra)
 library(grid)
 
-plot1 <- readPNG('E:/EIB/FIGURES/ROC.png')
+plot1 <- readPNG('E:/EIB/FIGURES/Figure-1Ca.png')
 plot2 <- read_webp("E:/EIB/FIGURES/dalle.webp")
 
 gl = list(gimmick, FIG_1, rasterGrob(plot1), rasterGrob(plot2) )
