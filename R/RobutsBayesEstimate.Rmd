@@ -102,7 +102,29 @@ print(bf_result)
 ```{r}
 # Plotting the prior
 prior_alt <- extract.samples( fit_alt, n=1000 )
-qnorm()
+
+group_id =matrix(c(rep(1, 1000), nrow = 1, byrow = TRUE) )
+group_id = rep(1,1000)
+
+student_t_samples <- sapply(1:length(group_id), function(n) {
+  t_sample <- rt(1, df = nu)  # Generate from standard Student's t-distribution
+  scaled_sample <- mu[group_id[n]] + sigma[group_id[n]] * t_sample  # Scale to have desired mean and standard deviation
+  return(scaled_sample)
+})
+
+student_t_samples <- sapply(1:length(group_id), function(n) {
+  t_sample <- rt(1, df = prior_alt$nu[n])  # Generate from standard Student's t-distribution
+  scaled_sample <- prior_alt$mu[n,group_id[n]] + prior_alt$sigma[n,group_id[n]] * t_sample  # Scale to have desired mean and standard deviation
+  return(scaled_sample)
+})
+
+mu.link <- function(n) {
+  t_sample <- rt(1, df = prior_alt$nu[n])  # Generate from standard Student's t-distribution
+  scaled_sample <- prior_alt$mu[n,group_id[n]] + prior_alt$sigma[n,group_id[n]] * t_sample  # Scale to have desired mean and standard deviation
+  return(scaled_sample)
+}
+
+mu <- sapply(group_id, mu.link)
 
 function(y) student_t(
 xseq <- c(-2,2)   
