@@ -43,9 +43,11 @@ generated quantities {
   real cohens_d;                                 // effect size; see footnote 1 in Kruschke paper
   real CLES;                                     // common language effect size
   real CLES2;                                    // a more explicit approach; the mean should roughly equal CLES
+  vector[N] log_lik;                             // log likelihood for each observation
   
   for (n in 1:N) {
     y_rep[n] = student_t_rng(nu, mu[group_id[n]], sigma[group_id[n]]);
+   log_lik[n] = student_t_lpdf(y[n] | nu, mu[group_id[n]], sigma[group_id[n]]);
   }
   
   mu_diff  = mu[1] - mu[2];
@@ -53,3 +55,4 @@ generated quantities {
   CLES     = normal_cdf(mu_diff / sqrt(sum(sigma)), 0, 1);
   CLES2    = student_t_rng(nu, mu[1], sigma[1]) - student_t_rng(nu, mu[2], sigma[2]) > 0;
 }
+
