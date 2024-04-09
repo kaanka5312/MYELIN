@@ -1,0 +1,87 @@
+---
+title: "RobutsBayesEstimate"
+author: "Kaan Keskin"
+date: "2024-04-09"
+output: pdf_document
+---
+ Robust Bayesian estimation between groups  https://m-clark.github.io/models-by-example/bayesian-t-test.html 
+ explains the process 
+
+```{r setup, include=FALSE}
+library(rstan)
+library(R.matlab)
+library(reshape2)
+```
+
+```{r}
+library(tidyverse)
+
+set.seed(1234)
+
+N_g   = 2       # N groups
+N_1   = 18000      # N for group 1
+N_2   = 18000      # N for group 2
+mu_1  = 1       # mean for group 1
+mu_2  = -.5     # mean for group 1
+sigma_1 = 1     # sd for group 1
+sigma_2 = 1     # sd for group 1
+
+y_1 = rnorm(N_1, mu_1, sigma_1)
+y_2 = rnorm(N_2, mu_2, sigma_2)
+y   = c(y_1, y_2)
+
+group_id = as.numeric(gl(2, N_1))
+
+# if unbalanced
+# group = 1:2
+# group_id = rep(group, c(N_1,N_2))
+
+d = data.frame(y, group_id)
+
+```
+
+```{r}
+dat <- readMat( "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/INT_all.mat" )
+dat2 <- readMat( "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/MED.mat" )
+
+ACW0 <- t( dat$ACW0.all )
+dat_ACW0 <- data.frame(ACW0)
+dat_ACW0$class <- dat2$MED[,5]
+
+long_ACW0 <- melt(dat_ACW0, variable.name = "Variable", value.name = "Value")
+long_ACW0$class <- rep(dat2$MED[,5],each=100)
+
+```
+
+```{r}
+stan_data = list(
+  N   = length(y),
+  N_g = N_g,
+  group_id = group_id,
+  y = y
+)
+
+stan_data = list(
+  N   = length(long_ACW0$Value),
+  N_g = 2,
+  group_id = long_ACW0$class,
+  y = long_ACW0$Value
+)
+
+
+library(rstan) 
+
+bayes_t_test <- stan_model("C:/Users/kaan/Documents/NatComm2023/MYELIN/R/bayes_t_test.stan")
+
+fit = sampling(
+  bayes_t_test,
+  data = stan_data,
+  thin = 4, 
+  cores = 4
+)
+
+```
+
+```{r}
+
+```
