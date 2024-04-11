@@ -137,6 +137,8 @@ for (i in 1:N_sim) {
     nu_i <- nu[i]
     mu_i <- mu[i, group_id_n]
     sigma_i <- sigma[i, group_id_n]
+# THIS PART IS NOT TRUE, Look the MediationGLMM in MYELIN for the ture part. should be rt(1e3, ...)
+# ALSO easier with with and sapply 
     y_simulated[i, n+1] <- rt(1, df = nu_i) * sigma_i + mu_i # Generate the data point
   }
 }
