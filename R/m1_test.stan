@@ -3,6 +3,7 @@ data{
     int afternoon[200];
     int cafe[200];
 }
+
 parameters{
     real a;
     real b;
@@ -18,7 +19,7 @@ transformed parameters{
     vector[20] a_cafe;
     a_cafe = (diag_pre_multiply(sigma_cafe, L_rho) * z_alfa);
     b_cafe = (diag_pre_multiply(sigma_cafe, L_rho) * z_beta);
-  
+    
 }
 
 model{
@@ -38,7 +39,7 @@ model{
 }
 
 generated quantities{
-    vector[1000] log_lik;
+    vector[200] log_lik;
     vector[200] mu;
     matrix[2,2] Rho;
     Rho = multiply_lower_tri_self_transpose(L_rho);
@@ -46,6 +47,6 @@ generated quantities{
  for ( i in 1:200 ) {
         mu[i] = a_cafe[cafe[i]] + b_cafe[cafe[i]] * afternoon[i];
     }
-    
-    for ( i in 1:1000 ) log_lik[i] = normal_lpdf( wait[i] | mu[i] , sigma );
+    for ( i in 1:200 ) log_lik[i] = normal_lpdf( wait[i] | mu[i] , sigma );
 }
+

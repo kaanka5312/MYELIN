@@ -35,8 +35,8 @@ mediated_2<- ulam(
 
 # Synthetic data to check model performance and estimation
 a <- 0 # Average gscorr content after standardized
-b <- 0.5 #Average myelin difference after standardized
-sigma_a <- 1 # std dev in intercepts 
+b <- (0.5) # Average myelin difference after standardized
+sigma_a <- 0.5 # std dev in intercepts 
 sigma_b <- 0.5 # std dev in slopes 
 rho <- (-0.7) # correlation between intercepts and slopes
 Mu <- c( a , b )
@@ -47,6 +47,7 @@ Rho <- matrix( c(1,rho,rho,1) , nrow=2 ) # correlation matrix
 Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
 
 n_regions <- 360
+n_groups <- 2
 
 library(MASS) 
 set.seed(5) # used to replicate example 
@@ -54,7 +55,8 @@ vary_effects <- mvrnorm( n_regions , Mu , Sigma )
 a_G <- vary_effects[,1] 
 bMY_G <- vary_effects[,2]
 MY_std <- rnorm(n_regions, 0, 1)
-G <- sample(c(rep(2, 33), rep(1, 327)))
+G <- sample(c(rep(2, 180), rep(1, 180)))
+#G <- rep(0:1, n_regions * n_groups/4)
 mu <- a_G[G] + bMY_G[G] * MY_std 
 sigma <- 0.5 
 GS_std <- rnorm(n_regions, mu, sigma)
@@ -64,6 +66,7 @@ syn_data <- list(
   GS_std = GS_std,
   G = G
 )
+
 
 plot( a_G , bMY_G , col=rangi2 
       , xlab="intercepts (a_cafe)" , ylab="slopes (b_cafe)" )
@@ -93,7 +96,7 @@ m1 <-  ulam(
     sigma_G ~ exponential(1), 
     sigma ~ exponential(1), 
     Rho ~ lkj_corr(2) ) , 
-    data = syn_data, chains = 4, cores = 4, log_lik = TRUE) 
+    data = syn_data, chains = 4, cores = 4, log_lik = TRUE, iter = 4000) 
 
 # Non - centered priors
 m1_nc <- stan_model("C:/Users/kaan/Documents/NatComm2023/MYELIN/R/m1.stan")
@@ -107,10 +110,14 @@ fit_m1_nc <- sampling(
 
 # Prior and posterior correlation
 post <- extract.samples( fit_m1_nc )
+
 dens( post$Rho[,1,2] , xlim=c(-1,1) ) # posterior
 R <- rlkjcorr( 1e4 , K=2 , eta=2 ) # prior
 dens( R[,1,2] , add=TRUE , lty=2 )
 
+dens( post$bMY_G[,1] , xlim=c(-1,1) ) # posterior
+prior<- mvrnorm( 1e4 , Mu , Sigma ) 
+dens( prior[,1] , add=TRUE , lty=2 )
 
 # Posterior prediction plot
 library(rethinking)
