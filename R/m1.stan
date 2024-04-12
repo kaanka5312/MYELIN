@@ -16,13 +16,13 @@ parameters{
 transformed parameters{
     vector[2] bMY_G;
     vector[2] a_G;
-    a_G = (diag_pre_multiply(sigma_G, L_rho) * z_alfa);
-    bMY_G = (diag_pre_multiply(sigma_G, L_rho) * z_beta);
+    a_G = a + (diag_pre_multiply(sigma_G, L_rho) * z_alfa);
+    bMY_G = bMY + (diag_pre_multiply(sigma_G, L_rho) * z_beta);
     
 }
 model{
     vector[360] mu;
-    L_rho ~ lkj_corr_cholesky( 4 );
+    L_rho ~ lkj_corr_cholesky( 2 );
     sigma ~ exponential( 1 );
     sigma_G ~ exponential( 1 );
     bMY ~ normal( 0 , 0.5 );
