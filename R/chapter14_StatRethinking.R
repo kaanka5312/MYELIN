@@ -22,10 +22,12 @@ b_cafe <- vary_effects[,2]
 set.seed(22) 
 N_visits <- 10 
 afternoon <- rep(0:1,N_visits*N_cafes/2) 
+#afternoon <- rnorm(200)
 cafe_id <- rep( 1:N_cafes , each=N_visits ) 
 mu <- a_cafe[cafe_id] + b_cafe[cafe_id]*afternoon 
 sigma <- 0.5 # std dev within cafes 
 wait <- rnorm( N_visits*N_cafes , mu , sigma ) 
+
 d <- data.frame( cafe=cafe_id , afternoon=afternoon , wait=wait )
 
 set.seed(867530) 

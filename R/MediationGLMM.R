@@ -1,43 +1,51 @@
+# Data preparation
+# Averaged over subjects data
 test <- readMat("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/MED.mat")
 d_2<- data.frame( GS_std = standardize(test$MED[,1]) ,
                   ACW_std = standardize(test$MED[,2]) ,
                   MY_std = standardize(test$MED[,3]),
                   G = as.factor(test$MED[,5]))
-# Synthetic data
+
+# All subjects and regions. Needed for varying intercept model
+p1 <- readMat( "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/INT_all.mat" )
+p2 <- readMat( "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/GSCORR.mat" )
+
+ACW0 <- c(t(p1$ACW0.all))
+MY <- c(t(p1$myelin.all))
+GS <- c(p2$GSCORR.arr) # Careful that this in 360x100 formal already
+subj <- rep(1:100, each = 360)
+G <- rep(test$MED[,5],100)
+
+d_subj <- list(MY_std = standardize(MY),
+               GS_std = standardize(GS),
+               subj = subj,
+               G = G)
 
 
-mediated_1<- ulam( 
-  alist( 
-    GS_std ~ dnorm( mu , sigma ) , 
-    mu <- a[G] + bACW[G] * ACW_std + bMY[G] * MY_std ,
-    a[G] ~ dnorm( 0, 0.15 ) , 
-    bACW[G] ~ dnorm( 0 , 0.27 ) ,
-    bMY[G] ~ dnorm( 0 , 0.27 ) ,
-    sigma ~ dexp( 1 ) ) , 
-  data=d_2, chains = 4, cores = 4, log_lik = TRUE) 
+d_subj2 <- list(MY_std = standardize(MY) * (G-1),
+                ACW_std = standardize(ACW0) * (G-1),
+               GS_std = standardize(GS),
+               G = subj)
 
 
-mediated_2<- ulam( 
-  alist( 
-    GS_std ~ dnorm( mu , sigma ) , 
-    # Interaction term is in the end
-    mu <- a[G] + bACW[G] * ACW_std + bMY[G] * MY_std + bACWMY[G] * ACW_std * MY_std ,
-    a[G] ~ dnorm( 0, 0.15 ) , 
-    bACW[G] ~ dnorm( 0 , 0.25 ) ,
-    bMY[G] ~ dnorm( 0 , 0.25 ) ,
-    bACWMY[G] ~ dnorm( 0, 0.25 ),
-    sigma ~ dexp( 1 ) ) , 
-  data=d_2, chains = 4, cores = 4, log_lik = TRUE) 
-
-######## 
+######### Synthetic data ######
 # Basic model with GS is only related to myelin with multivariate priors and 
 # partial pooling. Unfortunately, centered priors have divergent transition problems
-
 # Synthetic data to check model performance and estimation
-a <- 0 # Average gscorr content after standardized
-b <- (0.5) # Average myelin difference after standardized
+
+# Synthetic Data 1 -- For only Myelin as causal
+# Priors in the example of statistical rethinking chapter14
+#a <- 3.5 # average morning wait time 
+#b <- (-1) # average difference afternoon wait time 
+#sigma_a <- 1 # std dev in intercepts 
+#sigma_b <- 0.5 # std dev in slopes 
+
+a <- 0 # average morning wait time 
+b <- (-0.5) # average difference afternoon wait time 
 sigma_a <- 0.5 # std dev in intercepts 
-sigma_b <- 0.5 # std dev in slopes 
+sigma_b <- 0.25 # std dev in slopes 
+
+
 rho <- (-0.7) # correlation between intercepts and slopes
 Mu <- c( a , b )
 # Covariance matrix
@@ -46,35 +54,78 @@ Rho <- matrix( c(1,rho,rho,1) , nrow=2 ) # correlation matrix
 # now matrix multiply to get covariance matrix 
 Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
 
-n_regions <- 360
-n_groups <- 2
+N_cafes <- 100
 
 library(MASS) 
 set.seed(5) # used to replicate example 
-vary_effects <- mvrnorm( n_regions , Mu , Sigma )
-a_G <- vary_effects[,1] 
-bMY_G <- vary_effects[,2]
-MY_std <- rnorm(n_regions, 0, 1)
-G <- sample(c(rep(2, 180), rep(1, 180)))
-#G <- rep(0:1, n_regions * n_groups/4)
-mu <- a_G[G] + bMY_G[G] * MY_std 
-sigma <- 0.5 
-GS_std <- rnorm(n_regions, mu, sigma)
+vary_effects <- mvrnorm( N_cafes , Mu , Sigma )
 
-syn_data <- list(
-  MY_std = MY_std,
-  GS_std = GS_std,
-  G = G
-)
+a_cafe <- vary_effects[,1] 
+b_cafe <- vary_effects[,2]
+
+set.seed(22) 
+N_visits <- 360
+#afternoon <- rep(0:1,N_visits*N_cafes/2)
+afternoon <- rep(0:1,N_visits*N_cafes/2) * rnorm( N_visits*N_cafes )
+
+cafe_id <- rep( 1:N_cafes , each=N_visits ) 
+mu <- a_cafe[cafe_id] + b_cafe[cafe_id]*afternoon 
+sigma <- 0.5 # std dev within cafes 
+wait <- rnorm( N_visits*N_cafes , mu , sigma ) 
+
+#d <- data.frame( cafe=cafe_id , afternoon=afternoon , wait=wait )
+d_2 <- data.frame(G= cafe_id, MY_std = afternoon, GS_std = wait)
 
 
-plot( a_G , bMY_G , col=rangi2 
-      , xlab="intercepts (a_cafe)" , ylab="slopes (b_cafe)" )
+########## Synthetic data 2 ---- For Myelin + ACW
+# ACW as a predictor added.
+a <- 0 # average morning wait time 
+b <- (-0.5) # average difference afternoon wait time 
+sigma_a <- 0.5 # std dev in intercepts 
+sigma_b <- 0.25 # std dev in slopes 
 
-# overlay population distribution 
-library(ellipse) 
-for ( l in c(0.1,0.3,0.5,0.8,0.99) ) 
-  lines(ellipse(Sigma,centre=Mu,level=l),col=col.alpha("black",0.2))
+
+rho <- (-0.7) # correlation between intercepts and slopes
+Mu <- c( a , b )
+# Covariance matrix
+sigmas <- c(sigma_a,sigma_b) # standard deviations
+Rho <- matrix( c(1,rho,rho,1) , nrow=2 ) # correlation matrix
+# now matrix multiply to get covariance matrix 
+Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
+
+N_cafes <- 10
+
+library(MASS) 
+set.seed(5) # used to replicate example 
+vary_effects <- mvrnorm( N_cafes , Mu , Sigma )
+
+a_cafe <- vary_effects[,1] 
+b_cafe <- vary_effects[,2]
+
+set.seed(71)
+b_ACW = c()
+for (i in 1:N_cafes) {
+  bACW_G = rnorm(1,mean = -0.5,sd = 0.25)
+  z_ACW = rnorm(1)
+  sigma_ACW = dexp(1)
+  b_ACW[i] = bACW_G + z_ACW * sigma_ACW
+}
+
+set.seed(22) 
+N_visits <- 36
+#afternoon <- rep(0:1,N_visits*N_cafes/2)
+#afternoon <- rep(0:1,N_visits*N_cafes/2) * rnorm( N_visits*N_cafes )
+
+MY_std <- rep(0:1,N_visits*N_cafes/2) * rnorm( N_visits*N_cafes )
+ACW_std <- rep(0:1,N_visits*N_cafes/2) * rnorm( N_visits*N_cafes )
+
+
+cafe_id <- rep( 1:N_cafes , each=N_visits ) 
+mu <- a_cafe[cafe_id] + b_cafe[cafe_id]*MY_std + b_ACW[cafe_id]*ACW_std
+sigma <- 0.5 # std dev within cafes 
+wait <- rnorm( N_visits*N_cafes , mu , sigma ) 
+
+d_2 <- data.frame(G= cafe_id, MY_std = MY_std, ACW_std = ACW_std, GS_std = wait)
 
 # Model captures the parameters in synthetic data well.
 # Unfortunatelly centered priors are hard to converge
@@ -91,15 +142,17 @@ m1 <-  ulam(
     #vector[2]:bMY_G[G] ~ multi_normal( 0, Rho, sigma_G) ,
     
     # Fixed priors
+#    a ~ normal(5,2) , 
+ #   bMY ~ normal(-1,0.5) , 
     a ~ normal(0,0.5) , 
-    bMY ~ normal(0,0.5) , 
+    bMY ~ normal(-0.5,0.25) , 
     sigma_G ~ exponential(1), 
     sigma ~ exponential(1), 
     Rho ~ lkj_corr(2) ) , 
-    data = syn_data, chains = 4, cores = 4, log_lik = TRUE, iter = 4000) 
+    data = d_subj2, chains = 4, cores = 4, log_lik = TRUE, iter = 4000) 
 
 # Non - centered priors
-m1_nc <- stan_model("C:/Users/kaan/Documents/NatComm2023/MYELIN/R/m1.stan")
+m1_nc <- stan_model("C:/Users/kaan/Documents/NatComm2023/MYELIN/R/m1.2.stan")
 
 fit_m1_nc <- sampling(
   m1_nc,
@@ -108,8 +161,98 @@ fit_m1_nc <- sampling(
   cores = 4
 )
 
+# ACW as a predictor added
+m2 <-  ulam( 
+  alist( 
+    # Likelihood
+    GS_std ~ dnorm( mu , sigma ) , 
+    mu <- a_G[G] + bMY_G[G] * MY_std + bACW[G] * ACW_std,
+    
+    # Adaptive priors
+    c(a_G,bMY_G)[G] ~ multi_normal( c(a,bMY), Rho, sigma_G) ,
+    #vector[4]:c(a_G[G],bMY_G[G]) ~ multi_normal( c(a,bMY), Rho, sigma_G) ,
+    #vector[2]:bMY_G[G] ~ multi_normal( 0, Rho, sigma_G) ,
+    
+    # Fixed priors
+    a ~ normal(0,0.5) , 
+    bMY ~ normal(-0.5,0.25) , 
+    bACW[G] ~ dnorm(-0.5,0.25), # ACW added as a fixed prior
+    sigma_ACW ~ exponential(1),
+    sigma_G ~ exponential(1), 
+    sigma ~ exponential(1), 
+    Rho ~ lkj_corr(2)
+    ) , 
+  data = d_subj2, chains = 4, cores = 4, log_lik = TRUE, iter = 4000) 
+
+# N O T E ! 
+# There is nothing wrong with above multi - normal model. Only problem is 
+# the following understanded from the syntehtic data: We are sampling only 2 
+# samples from the multivariate dist. (As self and nonself), which hardens the 
+# estimation of distrubition (because we only have 2 samples) ending up with 
+# large SD posterior. Thus, another approach is taken. We apllied a varying 
+# intercept and slope for each subject and take Beta as contrast between. As
+# Can be understand from the synthetic data,non self regions are 0 and self's are 1.
+# In below reflects varying intercepts for subject, however slopes are only dif-
+# fered between self or nonself region groups. I think that is inferior.
+
+# N O T E: Due to number of subjects, model is fitted in 45 mins.
+m1.2 <-  ulam( 
+  alist( 
+    # Likelihood
+    GS_std ~ dnorm( mu , sigma ) , 
+    mu <- a[subj] + bMY[G] * MY_std ,
+    
+    # Adaptive priors
+    a[subj] ~ dnorm( a_G, sigma_a ) ,
+    bMY[G] ~ dnorm( bMY_G, sigma_b ) , 
+    
+    # Fixed priors
+    a_G ~ normal(0,1) , 
+    bMY_G ~ normal(0,1) , 
+    sigma_a ~ exponential(1) , 
+    sigma_b ~ exponential(1) , 
+    sigma ~ exponential(1)
+  ), data = d_subj, chains = 4, cores = 4, log_lik = TRUE, iter = 4000) 
+
+# Non-centered version of m1.2 to avoid divergent errors
+
+m1.2_nc <-  ulam( 
+  alist( 
+    # Likelihood
+    GS_std ~ dnorm( mu , sigma ) , 
+    #  Centered Version
+    # mu <- a[subj] + bMY[G] * MY_std ,
+    # Non - centered version
+    mu <- a_G + z_a[subj] * sigma_a + bMY_G + z_b[G] * sigma_b, 
+    
+    # Adaptive priors
+    # a[subj] ~ dnorm( a_G, sigma_a ) ,
+    # bMY[G] ~ dnorm( bMY_G, sigma_b ) , 
+    
+    # Fixed priors
+    a_G ~ normal(0,1) , 
+    bMY_G ~ normal(0,1) ,
+    
+    z_a ~ normal(0,1),
+    z_b ~ normal(0,1),
+    
+    sigma_a ~ exponential(1) , 
+    sigma_b ~ exponential(1) , 
+    sigma ~ exponential(1),
+    
+    # Generated Quantites
+    gq> vector[subj]:a <- a_G + z_a * sigma_a,
+    gq> vector[G]:bMY <- bMY_G + z_b * sigma_b  
+      
+  ), data = d_subj, chains = 4, cores = 4, log_lik = TRUE, iter = 4000) 
+
+
+###### Plotting #######
+
+# Posterior prediction plot
+library(rethinking)
 # Prior and posterior correlation
-post <- extract.samples( fit_m1_nc )
+post <- extract.samples( m1 )
 
 dens( post$Rho[,1,2] , xlim=c(-1,1) ) # posterior
 R <- rlkjcorr( 1e4 , K=2 , eta=2 ) # prior
@@ -118,10 +261,7 @@ dens( R[,1,2] , add=TRUE , lty=2 )
 dens( post$bMY_G[,1] , xlim=c(-1,1) ) # posterior
 prior<- mvrnorm( 1e4 , Mu , Sigma ) 
 dens( prior[,1] , add=TRUE , lty=2 )
-
-# Posterior prediction plot
-library(rethinking)
-prior <- extract.samples( fit_m1_nc, n=1000 )
+prior <- extract.samples( m1, n=1000 )
 
 N <- 1000 # total number of observations
 N_g <- 2 # number of groups
@@ -201,3 +341,51 @@ points( GS_std ~ MY_std  , data=d_2[d_2$G==2,], col = col.alpha(colors[2],0.3)  
 lines( xseq , mu_mean2 , lwd=2, col=colors[2] ) 
 shade( mu_PI2 , xseq , col = col.alpha(colors[2],0.15))
 
+## New 
+
+# compute posterior mean bivariate Gaussian 
+post <- extract.samples(m14.1)
+
+Mu_est <- c( mean(post$a) , mean(post$b) ) 
+rho_est <- mean( post$Rho[,1,2] ) 
+sa_est <- mean( post$sigma_cafe[,1] ) 
+sb_est <- mean( post$sigma_cafe[,2] ) 
+cov_ab <- sa_est*sb_est*rho_est 
+Sigma_est <- matrix( c(sa_est^2,cov_ab,cov_ab,sb_est^2) , ncol=2 )
+
+prior <- extract.samples(m1)
+
+a2 <- apply( prior$a_G , 2 , mean ) 
+b2 <- apply( prior$bMY_G , 2 , mean )
+
+Mu_est <- c( mean(prior$a) , mean(prior$bMY) ) 
+rho_est <- mean( prior$Rho[,1,2] ) 
+sa_est <- mean( prior$sigma_G[,1] ) 
+sb_est <- mean( prior$sigma_G[,2] ) 
+cov_ab <- sa_est*sb_est*rho_est 
+Sigma_est <- matrix( c(sa_est^2,cov_ab,cov_ab,sb_est^2) , ncol=2 )
+
+plot(a2,b2, xlab = "intercept", ylab = "slope", pch = 16, 
+     col=rangi2 , ylim=c( min(b2)-0.1 , max(b2)+0.1 ) , xlim=c( min(a2)-0.1 , max(a2)+0.1) )
+library(ellipse)
+for ( l in c(0.1,0.3,0.5,0.8,0.99) ) lines(ellipse(Sigma_est,centre=Mu_est,level=l), col=col.alpha("black",0.2))
+
+# Convert varying effects to GS
+GS_ns <- a2
+GS_s <- a2 + b2
+
+plot( GS_ns, GS_s, xlab = "GS nonself", ylab = "GS Self",
+      pch = 16, col = rangi2, 
+      ylim = c( min(GS_s)-0.1 , max(GS_s)+0.1 ),
+      xlim=c( min(GS_ns)-0.1 , max(GS_ns)+0.1 ) )
+abline( a=0 , b=1 , lty=2 )
+
+# now shrinkage distribution by simulation 
+v <- mvrnorm( 1e4 , Mu_est , Sigma_est ) 
+v[,2] <- v[,1] + v[,2] # calculate afternoon wait 
+Sigma_est2 <- cov(v) 
+Mu_est2 <- Mu_est 
+Mu_est2[2] <- Mu_est[1]+Mu_est[2]
+
+library(ellipse) 
+for ( l in c(0.1,0.3,0.5,0.8,0.99) ) lines(ellipse(Sigma_est2,centre=Mu_est2,level=l), col=col.alpha("black",0.5))
