@@ -224,3 +224,191 @@ post <- extract.samples( m5.3_A )
 M_sim <- with( post , 
                sapply( 1:30 , 
                        function(i) rnorm( 1e3 , aM + bAM*A_seq[i] , sigma_M ) ) )
+
+
+#######
+
+a <- 3.5 # average morning wait time 
+b <- (1) # average difference afternoon wait time 
+c <- (1)
+
+sigma_a <- 1 # std dev in intercepts 
+sigma_b <- 0.5 # std dev in slopes 
+sigma_c <- 0.5
+
+#rho <- (0.7) # correlation between intercepts and slopes
+Mu <- c( a , b, c)
+# Covariance matrix
+
+sigmas <- c(sigma_a,sigma_b, sigma_c) # standard deviations
+
+Rho <- matrix(c(1, 0.7, 0.1, 
+                0.7, 1, 0.07, 
+                0.1, 0.07, 1), nrow = 3, ncol = 3)
+
+#Rho <- matrix(c(1,rho,rho,1), ncol=2 )
+# now matrix multiply to get covariance matrix 
+
+Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
+
+N_cafes <- 20
+
+library(MASS) 
+set.seed(5) # used to replicate example 
+vary_effects <- mvrnorm( N_cafes , Mu , Sigma )
+
+a_cafe <- vary_effects[,1] 
+b_cafe <- vary_effects[,2]
+c_cafe <- vary_effects[,3]
+
+set.seed(22) 
+N_visits <- 100 
+afternoon <- rep(0:1,N_visits*N_cafes/2) 
+tired <- rnorm( N_visits*N_cafes, 1, 0.5  )
+
+#afternoon <- rnorm(200)
+cafe_id <- rep( 1:N_cafes , each=N_visits ) 
+mu <- a_cafe[cafe_id] + b_cafe[cafe_id]*afternoon + c_cafe[cafe_id]*tired*afternoon
+sigma <- 0.5 # std dev within cafes 
+wait <- rnorm( N_visits*N_cafes , mu , sigma ) 
+
+d <- data.frame( cafe=cafe_id , afternoon=afternoon , wait=wait )
+
+set.seed(867530) 
+m14.1 <- ulam( alist( wait ~ normal( mu , sigma ), 
+                      mu <- a_cafe[cafe] + b_cafe[cafe]*afternoon + c_cafe[cafe]*afternoon,
+                      #c(a_cafe,b_cafe,c_cafe)[cafe] ~ multi_normal( c(a,b,c) , c(0.7,0.5,0.35) , sigma_cafe ), 
+                      
+                      # adaptive priors - non-centered
+                      transpars> matrix[cafe,3]:coef <- compose_noncentered(, sigma_cafe, L_Rho, z_cafe ) ,
+                      matrix[3,cafe]:z_cafe ~ normal( 0 , 1 ),
+                      
+                      gp > matrix[cafe,1]:a_cafe <- coef[cafe,1],
+                      gp > matrix[cafe,1]:b_cafe <- coef[cafe,2],
+                      gp > matrix[cafe,1]:c_cafe <- coef[cafe,3],
+
+                      a ~ normal(5,2), 
+                      b ~ normal(-1,0.5), 
+                      c ~ normal(-1,0.5), 
+                      vector[3]:sigma_cafe ~ exponential(1), 
+                      sigma ~ exponential(1), 
+                      cholesky_factor_corr[4]:L_Rho ~ ~ lkj_corr_cholesky( 2 ),
+                      
+                      gq> matrix[3,3]:Rho_cafe <- Chol_to_Corr(L_Rho)
+                      ), 
+               data=d , chains=4 , cores=4,log_lik = TRUE )
+
+stan_code<-"
+data{
+    vector[2000] wait;
+    int afternoon[2000];
+    int cafe[2000];
+}
+
+parameters{
+    real a;
+    real b;
+    real c;
+    vector<lower=0>[3] sigma_cafe;
+    real<lower=0> sigma;
+    cholesky_factor_corr[3] L_rho; // Means Rho matrix is a 3x3 matrix
+    vector[3] z[20];
+}
+
+transformed parameters{
+    
+    vector[20] c_cafe;
+    vector[20] a_cafe;
+    vector[20] b_cafe; 
+    
+    for ( j in 1:20 ){
+    a_cafe[j] = a + (diag_pre_multiply(sigma_cafe, L_rho) * z[j])[1];
+    b_cafe[j] = b + (diag_pre_multiply(sigma_cafe, L_rho) * z[j])[2];
+    c_cafe[j] = c + (diag_pre_multiply(sigma_cafe, L_rho) * z[j])[3];
+    }
+}
+
+model{
+    vector[2000] mu;
+    L_rho ~ lkj_corr_cholesky( 4 );
+    sigma ~ exponential( 1 );
+    sigma_cafe ~ exponential( 1 );
+    c ~ normal( 1 , 0.5 );
+    b ~ normal( 1 , 0.5 );
+    a ~ normal( 5 , 2 );
+    
+    // Properly specify prior for each element of each vector in the z array
+    for (i in 1:20) {
+        z[i] ~ normal(0, 1);  // This applies the normal distribution to each 2D vector
+    }
+    
+    for ( i in 1:2000 ) {
+        mu[i] = a_cafe[cafe[i]] + b_cafe[cafe[i]] * afternoon[i] + c_cafe[cafe[i]] * afternoon[i] ;
+    }
+    wait ~ normal( mu , sigma );
+}
+
+generated quantities{
+    vector[2000] log_lik;
+    vector[2000] mu;
+    matrix[3,3] Rho;
+    Rho = multiply_lower_tri_self_transpose(L_rho);
+    
+ for ( i in 1:2000 ) {
+        mu[i] = a_cafe[cafe[i]] + b_cafe[cafe[i]] * afternoon[i] + c_cafe[cafe[i]] * afternoon[i] ;
+    }
+    for ( i in 1:2000 ) log_lik[i] = normal_lpdf( wait[i] | mu[i] , sigma );
+}
+
+"
+
+
+
+
+stan_model_object <- stanc(model_code = stan_code)
+model <- stan_model(stanc_ret = stan_model_object)
+# Sample from the model
+fit <- sampling(model, data = d, iter = 2000, chains = 4)
+
+
+
+stan_gpt <- "
+data {
+  int<lower=0> N;
+  vector[N] Y;
+  vector[N] X1;
+  vector[N] X2;
+}
+
+parameters {
+  vector[3] z;
+  cholesky_factor_corr[3] L_rho;
+  vector<lower=0>[3] sigma;
+  real<lower=0> sigma_y;
+}
+
+transformed parameters {
+  vector[3] beta;
+  beta = diag_pre_multiply(sigma, L_rho) * z;
+}
+
+model {
+  L_rho ~ lkj_corr_cholesky(1);
+  z ~ normal(0, 1);
+  sigma ~ cauchy(0, 2.5);
+  sigma_y ~ cauchy(0, 2.5);
+  
+  Y ~ normal(beta[1] + beta[2] * X1 + beta[3] * X2, sigma_y);
+}
+
+generated quantities {
+  matrix[3,3] Rho;
+  Rho = multiply_lower_tri_self_transpose(L_rho);
+}
+
+
+"
+stan_model_object <- stanc(model_code = stan_gpt)
+model <- stan_model(stanc_ret = stan_model_object)
+# Sample from the model
+fit.gpt <- sampling(model, data = dat, iter = 2000, chains = 4)

@@ -127,6 +127,37 @@ wait <- rnorm( N_visits*N_cafes , mu , sigma )
 
 d_2 <- data.frame(G= cafe_id, MY_std = MY_std, ACW_std = ACW_std, GS_std = wait)
 
+
+#### 
+
+
+a <- 0 # average morning wait time 
+b1 <- 0 # average difference afternoon wait time 
+b2 <- 0
+
+sigma_a <- 0.5 # std dev in intercepts 
+sigma_b1 <- 0.25 # std dev in slopes 
+sigma_b2 <- 0.25 # std dev in slopes 
+
+#rho <- (-0.7) # correlation between intercepts and slopes
+Mu <- c( a , b1, b2 )
+# Covariance matrix
+sigmas <- c( sigma_a,sigma_b1, sigma_b2 ) # standard deviations
+Rho <- matrix(c(1, 0.7, 0.5, 
+               0.7, 1, 0.35, 
+               0.5, 0.35, 1), nrow = 3, ncol = 3)
+
+# now matrix multiply to get covariance matrix 
+Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
+
+N_cafes <- 10
+
+library(MASS) 
+set.seed(5) # used to replicate example 
+vary_effects <- mvrnorm( N_cafes , Mu , Sigma )
+
+####
+
 # Model captures the parameters in synthetic data well.
 # Unfortunatelly centered priors are hard to converge
 set.seed(4387510) 
@@ -353,32 +384,32 @@ sb_est <- mean( post$sigma_cafe[,2] )
 cov_ab <- sa_est*sb_est*rho_est 
 Sigma_est <- matrix( c(sa_est^2,cov_ab,cov_ab,sb_est^2) , ncol=2 )
 
-prior <- extract.samples(m1)
+post <- extract.samples(m1)
 
-a2 <- apply( prior$a_G , 2 , mean ) 
-b2 <- apply( prior$bMY_G , 2 , mean )
+a2 <- apply( post$a_G , 2 , mean ) 
+b2 <- apply( post$bMY_G , 2 , mean )
 
-Mu_est <- c( mean(prior$a) , mean(prior$bMY) ) 
-rho_est <- mean( prior$Rho[,1,2] ) 
-sa_est <- mean( prior$sigma_G[,1] ) 
-sb_est <- mean( prior$sigma_G[,2] ) 
+Mu_est <- c( mean(post$a) , mean(post$bMY) ) 
+rho_est <- mean( post$Rho[,1,2] ) 
+sa_est <- mean( post$sigma_G[,1] ) 
+sb_est <- mean( post$sigma_G[,2] ) 
 cov_ab <- sa_est*sb_est*rho_est 
 Sigma_est <- matrix( c(sa_est^2,cov_ab,cov_ab,sb_est^2) , ncol=2 )
 
 plot(a2,b2, xlab = "intercept", ylab = "slope", pch = 16, 
      col=rangi2 , ylim=c( min(b2)-0.1 , max(b2)+0.1 ) , xlim=c( min(a2)-0.1 , max(a2)+0.1) )
 library(ellipse)
-for ( l in c(0.1,0.3,0.5,0.8,0.99) ) lines(ellipse(Sigma_est,centre=Mu_est,level=l), col=col.alpha("black",0.2))
+for ( l in c(0.1,0.3,0.5,0.8,0.99) ) lines(ellipse(Sigma_est,centre=Mu_est,level=l), col=col.alpha("black",0.2),lwd=2)
 
 # Convert varying effects to GS
 GS_ns <- a2
 GS_s <- a2 + b2
 
-plot( GS_ns, GS_s, xlab = "GS nonself", ylab = "GS Self",
+plot( GS_ns, GS_s, xlab = "standardized GS nonself", ylab = "standardized GS Self",
       pch = 16, col = rangi2, 
       ylim = c( min(GS_s)-0.1 , max(GS_s)+0.1 ),
       xlim=c( min(GS_ns)-0.1 , max(GS_ns)+0.1 ) )
-abline( a=0 , b=1 , lty=2 )
+abline( a=0 , b=1 , lty=2, lwd=2 )
 
 # now shrinkage distribution by simulation 
 v <- mvrnorm( 1e4 , Mu_est , Sigma_est ) 
@@ -388,4 +419,4 @@ Mu_est2 <- Mu_est
 Mu_est2[2] <- Mu_est[1]+Mu_est[2]
 
 library(ellipse) 
-for ( l in c(0.1,0.3,0.5,0.8,0.99) ) lines(ellipse(Sigma_est2,centre=Mu_est2,level=l), col=col.alpha("black",0.5))
+for ( l in c(0.1,0.3,0.5,0.8,0.99) ) lines(ellipse(Sigma_est2,centre=Mu_est2,level=l), col=col.alpha("black",0.5), lwd=2)
