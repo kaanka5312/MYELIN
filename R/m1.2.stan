@@ -9,7 +9,7 @@ parameters{
     vector<lower=0>[2] sigma_G;
     real<lower=0> sigma;
     cholesky_factor_corr[2] L_rho; // Means Rho matrix is a 2x2 matrix
-    vector[2] z[2];
+    vector[2] z[100];
 }
 
 transformed parameters{
@@ -45,9 +45,9 @@ generated quantities{
     vector[36000] mu;
     matrix[2,2] Rho;
     Rho = multiply_lower_tri_self_transpose(L_rho);
-    for ( i in 1:360 ) {
+    for ( i in 1:36000 ) {
         mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i];
     }
-    for ( i in 1:360 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );
+    for ( i in 1:36000 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );
 }
 

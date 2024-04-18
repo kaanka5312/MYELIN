@@ -93,7 +93,7 @@ Rho <- matrix( c(1,rho,rho,1) , nrow=2 ) # correlation matrix
 # now matrix multiply to get covariance matrix 
 Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
 
-N_cafes <- 10
+N_cafes <- 100
 
 library(MASS) 
 set.seed(5) # used to replicate example 
@@ -112,7 +112,7 @@ for (i in 1:N_cafes) {
 }
 
 set.seed(22) 
-N_visits <- 36
+N_visits <- 360
 #afternoon <- rep(0:1,N_visits*N_cafes/2)
 #afternoon <- rep(0:1,N_visits*N_cafes/2) * rnorm( N_visits*N_cafes )
 
@@ -126,35 +126,6 @@ sigma <- 0.5 # std dev within cafes
 wait <- rnorm( N_visits*N_cafes , mu , sigma ) 
 
 d_2 <- data.frame(G= cafe_id, MY_std = MY_std, ACW_std = ACW_std, GS_std = wait)
-
-
-#### 
-
-
-a <- 0 # average morning wait time 
-b1 <- 0 # average difference afternoon wait time 
-b2 <- 0
-
-sigma_a <- 0.5 # std dev in intercepts 
-sigma_b1 <- 0.25 # std dev in slopes 
-sigma_b2 <- 0.25 # std dev in slopes 
-
-#rho <- (-0.7) # correlation between intercepts and slopes
-Mu <- c( a , b1, b2 )
-# Covariance matrix
-sigmas <- c( sigma_a,sigma_b1, sigma_b2 ) # standard deviations
-Rho <- matrix(c(1, 0.7, 0.5, 
-               0.7, 1, 0.35, 
-               0.5, 0.35, 1), nrow = 3, ncol = 3)
-
-# now matrix multiply to get covariance matrix 
-Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
-
-N_cafes <- 10
-
-library(MASS) 
-set.seed(5) # used to replicate example 
-vary_effects <- mvrnorm( N_cafes , Mu , Sigma )
 
 ####
 
@@ -180,19 +151,236 @@ m1 <-  ulam(
     sigma_G ~ exponential(1), 
     sigma ~ exponential(1), 
     Rho ~ lkj_corr(2) ) , 
-    data = d_subj2, chains = 4, cores = 4, log_lik = TRUE, iter = 4000) 
+    data = d_2, chains = 4, cores = 4, log_lik = TRUE, iter = 4000) 
 
 # Non - centered priors
-m1_nc <- stan_model("C:/Users/kaan/Documents/NatComm2023/MYELIN/R/m1.2.stan")
+m1.2 <- stan_model("C:/Users/kaan/Documents/NatComm2023/MYELIN/R/m1.2.stan")
 
 fit_m1_nc <- sampling(
-  m1_nc,
-  data = syn_data ,
+  m1.2,
+  data = d_2 ,
   thin = 4 ,
-  cores = 4
+  cores = 4,
+  chains = 1
 )
 
-# ACW as a predictor added
+######### ACW as a predictor added ######
+### Model example#####
+## Synthetic Data ##
+a <- 3.5   # Average morning wait time
+b <- -1    # Average difference afternoon wait time
+c <- 2     # Average effect of another covariate, like weekend
+
+sigma_a <- 1   # Std dev in intercepts
+sigma_b <- 0.5 # Std dev in slopes for b_cafe
+sigma_c <- 0.5 # Std dev in slopes for c_cafe
+rho <- -0.7    # Correlation between intercepts and slopes
+
+Mu <- c(a, b, c)
+sigmas <- c(sigma_a, sigma_b, sigma_c)
+Rho <- matrix(c(1, rho, rho,
+                rho, 1, 0,   # Assuming b_cafe and c_cafe are uncorrelated
+                rho, 0, 1), nrow=3)  # Correlation matrix
+
+# Now matrix multiply to get covariance matrix
+Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
+
+N_cafes <- 20
+library(MASS)
+set.seed(5)
+vary_effects <- mvrnorm(N_cafes, Mu, Sigma)
+
+a_cafe <- vary_effects[, 1]
+b_cafe <- vary_effects[, 2]
+c_cafe <- vary_effects[, 3]
+
+set.seed(22)
+N_visits <- 10
+afternoon <- rep(0:1, N_visits * N_cafes / 2)
+weekend <- sample(0:1, N_visits * N_cafes, replace = TRUE)  # New covariate, e.g., weekend or not
+
+cafe_id <- rep(1:N_cafes, each = N_visits)
+mu <- a_cafe[cafe_id] + b_cafe[cafe_id] * afternoon + c_cafe[cafe_id] * weekend
+sigma <- 0.5
+wait <- rnorm(N_visits * N_cafes, mu, sigma)
+
+d <- data.frame(cafe = cafe_id, afternoon = afternoon, weekend = weekend, wait = wait)
+
+### Stan Model ###
+stan_code <-" 
+data{
+  vector[200] wait;
+  int afternoon[200];
+  int weekend[200];
+  int cafe[200];
+}
+
+parameters{
+  real a;
+  real b;
+  real c;
+  vector<lower=0>[3] sigma_cafe;
+  real<lower=0> sigma;
+  cholesky_factor_corr[3] L_rho; // Means Rho matrix is a 2x2 matrix
+  vector[3] z[20];
+}
+
+transformed parameters{
+  vector[20] b_cafe;
+  vector[20] a_cafe;
+  vector[20] c_cafe;
+  
+  for ( j in 1:20 ){
+    a_cafe[j] = a + (diag_pre_multiply(sigma_cafe, L_rho) * z[j])[1];
+    b_cafe[j] = b + (diag_pre_multiply(sigma_cafe, L_rho) * z[j])[2];
+    c_cafe[j] = c + (diag_pre_multiply(sigma_cafe, L_rho) * z[j])[3];
+  }
+}
+
+model{
+  vector[200] mu;
+  L_rho ~ lkj_corr_cholesky( 2 );
+  sigma ~ exponential( 1 );
+  sigma_cafe ~ exponential( 1 );
+  c ~ normal( 2 , 0.5 );
+  b ~ normal( -1 , 0.5 );
+  a ~ normal( 5 , 2 );
+  
+  // Properly specify prior for each element of each vector in the z array
+  for (i in 1:20) {
+    z[i] ~ normal(0, 1);  // This applies the normal distribution to each 2D vector
+  }
+
+  for ( i in 1:200 ) {
+    mu[i] = a_cafe[cafe[i]] + b_cafe[cafe[i]] * afternoon[i] + c_cafe[cafe[i]] * weekend[i];
+  }
+  wait ~ normal( mu , sigma );
+}
+
+generated quantities{
+  vector[200] log_lik;
+  vector[200] mu;
+  matrix[3,3] Rho;
+  Rho = multiply_lower_tri_self_transpose(L_rho);
+  
+  for ( i in 1:200 ) {
+    mu[i] = a_cafe[cafe[i]] + b_cafe[cafe[i]] * afternoon[i] + c_cafe[cafe[i]] * weekend[i];
+  }
+  for ( i in 1:200 ) log_lik[i] = normal_lpdf( wait[i] | mu[i] , sigma );
+}
+"
+
+stan_model_object <- stanc(model_code = stan_code)
+model <- stan_model(stanc_ret = stan_model_object)
+fit <- sampling(model, data = d, iter = 2000, chains = 4)
+# Model can capture the correlations in synthetic data 
+#### Altered numbers and names, priors also #####
+## Synthetic Data ##
+a <- 0 # average morning wait time 
+b <- (-0.5) # average difference afternoon wait time 
+sigma_a <- 0.5 # std dev in intercepts 
+sigma_b <- 0.25 # std dev in slopes 
+
+sigma_a <- 1   # Std dev in intercepts
+sigma_b <- 0.5 # Std dev in slopes for b_cafe
+sigma_c <- 0.5 # Std dev in slopes for c_cafe
+rho <- -0.7    # Correlation between intercepts and slopes
+
+Mu <- c(a, b, c)
+sigmas <- c(sigma_a, sigma_b, sigma_c)
+Rho <- matrix(c(1, rho, rho,
+                rho, 1, 0,   # Assuming b_cafe and c_cafe are uncorrelated
+                rho, 0, 1), nrow=3)  # Correlation matrix
+
+# Now matrix multiply to get covariance matrix
+Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
+
+N_cafes <- 100
+library(MASS)
+set.seed(5)
+vary_effects <- mvrnorm(N_cafes, Mu, Sigma)
+
+a_cafe <- vary_effects[, 1]
+b_cafe <- vary_effects[, 2]
+c_cafe <- vary_effects[, 3]
+
+set.seed(22)
+N_visits <- 360
+afternoon <- rep(0:1, N_visits * N_cafes / 2) * rnorm( N_visits*N_cafes )
+# New covariate, e.g., weekend or not
+weekend <- sample(0:1, N_visits * N_cafes, replace = TRUE) * rnorm( N_visits*N_cafes )  
+
+cafe_id <- rep(1:N_cafes, each = N_visits)
+mu <- a_cafe[cafe_id] + b_cafe[cafe_id] * afternoon + c_cafe[cafe_id] * weekend
+sigma <- 0.5
+wait <- rnorm(N_visits * N_cafes, mu, sigma)
+
+d <- data.frame(G=cafe_id, MY_std = afternoon, ACW_std = weekend, GS_std = wait)
+
+# Stan model ####
+stan_mediated <-"
+data{
+  vector[36000] GS_std;
+  vector[36000] MY_std;
+  vector[36000] ACW_std;
+  int G[36000];
+}
+parameters{
+  real a;
+  real bMY;
+  real bACW;
+  vector<lower=0>[3] sigma_G;
+  real<lower=0> sigma;
+  cholesky_factor_corr[3] L_rho; // Means Rho matrix is a 3x3 matrix
+  vector[3] z[3];
+}
+
+transformed parameters{
+  vector[100] bACW_G;
+  vector[100] bMY_G;
+  vector[100] a_G;
+  for ( j in 1:100 ){
+    
+    a_G[j] = a + (diag_pre_multiply(sigma_G, L_rho) * z[j])[1];
+    bMY_G[j] = bMY + (diag_pre_multiply(sigma_G, L_rho) * z[j])[2];
+    bACW_G[j] = bACW + (diag_pre_multiply(sigma_G, L_rho) * z[j])[3];
+  } 
+}
+model{
+  vector[36000] mu;
+  L_rho ~ lkj_corr_cholesky( 2 );
+  sigma ~ exponential( 1 );
+  sigma_G ~ exponential( 1 );
+  bACW ~ normal( 0.5 , 0.25 );
+  bMY ~ normal( -0.5 , 0.25 );
+  a ~ normal( 0 , 0.5 );
+  
+  for (i in 1:100) {
+    z[i] ~ normal(0, 1);  // This applies the normal distribution to each 2D vector
+  }
+  
+  for ( i in 1:36000 ) {
+    mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
+  }
+  GS_std ~ normal( mu , sigma );
+}
+
+generated quantities{
+  vector[36000] log_lik;
+  vector[36000] mu;
+  matrix[3,3] Rho;
+  Rho = multiply_lower_tri_self_transpose(L_rho);
+  for ( i in 1:36000 ) {
+    mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
+  }
+  for ( i in 1:36000 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );
+}
+"
+stan_model_object <- stanc(model_code = stan_mediated)
+model <- stan_model(stanc_ret = stan_model_object)
+fit <- sampling(model, data = d, iter = 2000, chains = 4)
+
+
 m2 <-  ulam( 
   alist( 
     # Likelihood
@@ -420,3 +608,4 @@ Mu_est2[2] <- Mu_est[1]+Mu_est[2]
 
 library(ellipse) 
 for ( l in c(0.1,0.3,0.5,0.8,0.99) ) lines(ellipse(Sigma_est2,centre=Mu_est2,level=l), col=col.alpha("black",0.5), lwd=2)
+

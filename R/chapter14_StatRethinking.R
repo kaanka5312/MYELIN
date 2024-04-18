@@ -262,7 +262,7 @@ b_cafe <- vary_effects[,2]
 c_cafe <- vary_effects[,3]
 
 set.seed(22) 
-N_visits <- 100 
+N_visits <- 10
 afternoon <- rep(0:1,N_visits*N_cafes/2) 
 tired <- rnorm( N_visits*N_cafes, 1, 0.5  )
 
@@ -372,6 +372,44 @@ fit <- sampling(model, data = d, iter = 2000, chains = 4)
 
 
 
+library(MASS)
+
+# Set parameters
+set.seed(123)  # for reproducibility
+N <- 100       # number of observations
+alpha_true <- 0
+beta1_true <- 1
+beta2_true <- 2
+
+# Stronger correlations for clearer effects
+sigma <- 1
+sigma_alpha <- 1
+sigma_beta1 <- 1
+sigma_beta2 <- 1
+rho_alpha_beta1 <- 0.7
+rho_alpha_beta2 <- 0.7
+rho_beta1_beta2 <- 0.5
+Covariance <- matrix(c(sigma_alpha^2, rho_alpha_beta1 * sigma_alpha * sigma_beta1, rho_alpha_beta2 * sigma_alpha * sigma_beta2,
+                       rho_alpha_beta1 * sigma_alpha * sigma_beta1, sigma_beta1^2, rho_beta1_beta2 * sigma_beta1 * sigma_beta2,
+                       rho_alpha_beta2 * sigma_alpha * sigma_beta2, rho_beta1_beta2 * sigma_beta1 * sigma_beta2, sigma_beta2^2),
+                     nrow = 3, byrow = TRUE)
+
+# Generate multivariate normal data for parameters
+params <- mvrnorm(n = N, mu = c(alpha_true, beta1_true, beta2_true), Sigma = Covariance)
+
+# Create covariates
+X1 <- rnorm(N, mean = 2, sd = 1)
+X2 <- rnorm(N, mean = 3, sd = 1.5)
+
+# Generate outcome variable
+mu <- params[, 1] + params[, 2] * X1 + params[, 3] * X2 
+Y <- rnorm(N, mu, sigma)
+# Prepare data for Stan
+data_list <- list(N = N, Y = Y, X1 = X1, X2 = X2)
+
+
+
+
 stan_gpt <- "
 data {
   int<lower=0> N;
@@ -381,6 +419,64 @@ data {
 }
 
 parameters {
+  real a;
+  real b;
+  real c;
+  vector[3] z[N];
+  cholesky_factor_corr[3] L_rho;
+  vector<lower=0>[3] sigma;
+  real<lower=0> sigma_y;
+}
+
+transformed parameters {
+  vector[N] beta_0;
+  vector[N] beta_1;
+  vector[N] beta_2;
+  
+  for ( j in 1:N ){
+    beta_0[j] = a + (diag_pre_multiply(sigma, L_rho) * z[j])[1];
+    beta_1[j] = b + (diag_pre_multiply(sigma, L_rho) * z[j])[2];
+    beta_2[j] = c + (diag_pre_multiply(sigma, L_rho) * z[j])[3];
+    }
+}
+
+model {
+  L_rho ~ lkj_corr_cholesky(2);
+  sigma ~ exponential( 1 );
+  sigma_y ~ exponential( 1 );
+  a ~ normal(0, 1);
+  b ~ normal(1, 1);
+  c ~ normal(2, 1);
+  
+  for (i in 1:N) {
+        z[i] ~ normal(0, 1);  
+    }
+  
+   // Correcting the model statement to use beta vectors
+  for (i in 1:N) {
+    Y[i] ~ normal(beta_0[i] + beta_1[i] * X1[i] + beta_2[i] * X2[i], sigma_y);
+  }
+}
+
+
+generated quantities {
+  matrix[3,3] Rho;
+  Rho = multiply_lower_tri_self_transpose(L_rho);
+}
+"
+
+stan_gpt <- "
+data {
+  int<lower=0> N;
+  vector[N] Y;
+  vector[N] X1;
+  vector[N] X2;
+}
+
+parameters {
+  real a;
+  real b;
+  real c;
   vector[3] z;
   cholesky_factor_corr[3] L_rho;
   vector<lower=0>[3] sigma;
@@ -388,27 +484,60 @@ parameters {
 }
 
 transformed parameters {
-  vector[3] beta;
-  beta = diag_pre_multiply(sigma, L_rho) * z;
+  vector[N] beta_0 = rep_vector(a, N) + rep_vector(sigma[1], N) .* (L_rho[1,1] * z[1] + L_rho[2,1] * z[2] + L_rho[3,1] * z[3]);
+  vector[N] beta_1 = rep_vector(b, N) + rep_vector(sigma[2], N) .* (L_rho[1,2] * z[1] + L_rho[2,2] * z[2] + L_rho[3,2] * z[3]);
+  vector[N] beta_2 = rep_vector(c, N) + rep_vector(sigma[3], N) .* (L_rho[1,3] * z[1] + L_rho[2,3] * z[2] + L_rho[3,3] * z[3]);
 }
 
 model {
-  L_rho ~ lkj_corr_cholesky(1);
-  z ~ normal(0, 1);
-  sigma ~ cauchy(0, 2.5);
-  sigma_y ~ cauchy(0, 2.5);
+
+  L_rho ~ lkj_corr_cholesky(2);
+  sigma ~ exponential( 1 );
+  sigma_y ~ exponential( 1 );
+  a ~ normal(0, 1);
+  b ~ normal(1, 1);
+  c ~ normal(2, 1);
+  z ~ normal(0, 1);  
+
+  Y ~ normal(beta_0 + beta_1 .* X1 + beta_2 .* X2, sigma_y);
   
-  Y ~ normal(beta[1] + beta[2] * X1 + beta[3] * X2, sigma_y);
 }
+
 
 generated quantities {
   matrix[3,3] Rho;
   Rho = multiply_lower_tri_self_transpose(L_rho);
 }
-
-
 "
+
+
 stan_model_object <- stanc(model_code = stan_gpt)
 model <- stan_model(stanc_ret = stan_model_object)
 # Sample from the model
-fit.gpt <- sampling(model, data = dat, iter = 2000, chains = 4)
+fit.gpt <- sampling(model, data = data_list, iter = 2000, chains = 1, core  = 4)
+
+m2 <-  ulam( 
+  alist( 
+    # Likelihood
+    Y ~ dnorm( mu , sigma ) , 
+    mu <- beta_0 + beta_1 * X1 + beta_2 * X2,
+    beta_0 <- a + v[,1],
+    beta_1 <- b + v[,2],
+    beta_2 <- c + v[,3],
+  
+    # Adaptive priors
+    vector[3]:v ~ multi_normal( 0, Rho, sigma_y) ,
+    
+    
+    # Fixed priors
+    a ~ normal(0,1) , 
+    b ~ normal(1,1) , 
+    c ~ dnorm(2,1), # ACW added as a fixed prior
+    sigma ~ exponential(1),
+    sigma_y ~ exponential(1), 
+    cholesky_factor_corr[3]:L_Rho ~ lkj_corr_cholesky( 2 ),
+    
+    # Generated quantites
+    gq> matrix[3,3]:Rho <<- Chol_to_Corr(L_Rho),
+  ) , 
+  data = data_list, chains = 4, cores = 4, log_lik = TRUE, iter = 4000) 
