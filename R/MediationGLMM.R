@@ -207,6 +207,7 @@ wait <- rnorm(N_visits * N_cafes, mu, sigma)
 d <- data.frame(cafe = cafe_id, afternoon = afternoon, weekend = weekend, wait = wait)
 
 ### Stan Model ###
+# MY -> GS <- ACW 
 stan_code <-" 
 data{
   vector[200] wait;
@@ -269,21 +270,258 @@ generated quantities{
   for ( i in 1:200 ) log_lik[i] = normal_lpdf( wait[i] | mu[i] , sigma );
 }
 "
+# MY -> GS <- ACW 
+stan_code <-" 
+data{
+  vector[200] wait;
+  int afternoon[200];
+  int weekend[200];
+  int cafe[200];
+}
+
+parameters{
+  real a;
+  real b;
+  real c;
+  vector<lower=0>[3] sigma_cafe;
+  real<lower=0> sigma;
+  cholesky_factor_corr[3] L_rho; // Means Rho matrix is a 2x2 matrix
+  vector[3] z[20];
+  real a_C;  // Intercept for modeling weekend as a function of afternoon
+  real b_C;  // Slope for modeling weekend as a function of afternoon
+}
+
+transformed parameters{
+  vector[20] b_cafe;
+  vector[20] a_cafe;
+  vector[20] c_cafe;
+  
+  for ( j in 1:20 ){
+    a_cafe[j] = a + (diag_pre_multiply(sigma_cafe, L_rho) * z[j])[1];
+    b_cafe[j] = b + (diag_pre_multiply(sigma_cafe, L_rho) * z[j])[2];
+    c_cafe[j] = c + (diag_pre_multiply(sigma_cafe, L_rho) * z[j])[3];
+  }
+}
+
+model{
+  vector[200] mu;
+  L_rho ~ lkj_corr_cholesky( 2 );
+  sigma ~ exponential( 1 );
+  sigma_cafe ~ exponential( 1 );
+  c ~ normal( 2 , 0.5 );
+  b ~ normal( -1 , 0.5 );
+  a ~ normal( 5 , 2 );
+  a_C ~ normal(0, 1);  // Reasonable prior for the intercept
+  b_C ~ normal(0, 1);  // Reasonable prior for the slope
+  
+  // Properly specify prior for each element of each vector in the z array
+  for (i in 1:20) {
+    z[i] ~ normal(0, 1);  // This applies the normal distribution to each 2D vector
+  }
+  
+  for ( i in 1: 200 ) {
+   weekend[i] ~ bernoulli_logit(a_C + b_C * afternoon[i]);
+  }
+
+  for ( i in 1:200 ) {
+    mu[i] = a_cafe[cafe[i]] + b_cafe[cafe[i]] * afternoon[i] + c_cafe[cafe[i]] * weekend[i];
+  }
+  wait ~ normal( mu , sigma );
+}
+
+generated quantities{
+  vector[200] log_lik;
+  vector[200] mu;
+  matrix[3,3] Rho;
+  Rho = multiply_lower_tri_self_transpose(L_rho);
+  
+  for ( i in 1:200 ) {
+    mu[i] = a_cafe[cafe[i]] + b_cafe[cafe[i]] * afternoon[i] + c_cafe[cafe[i]] * weekend[i];
+  }
+  for ( i in 1:200 ) log_lik[i] = normal_lpdf( wait[i] | mu[i] , sigma );
+}
+"
 
 stan_model_object <- stanc(model_code = stan_code)
 model <- stan_model(stanc_ret = stan_model_object)
 fit <- sampling(model, data = d, iter = 2000, chains = 4)
+
+# Counterfactual 
+posterior_samples <- extract(fit)
+# Manual computation of the predicted outcomes
+predict_wait_times <- function(samples, afternoon_scenario) {
+  # Meaning across cafes 
+  # Retrieve the number of posterior samples
+  num_samples <- ncol(samples$a_cafe)
+  N <- nrow(samples$a_cafe)
+  
+  # Compute the predictions for each sample
+  predicted_wait <- matrix(ncol = num_samples, nrow = N)
+  
+    for (i in 1:num_samples) {
+    # Calculate the mediator (weekend) under counterfactual afternoon scenario
+    logit_p <- samples$a_C + samples$b_C * afternoon_scenario
+    p_weekend <- 1 / (1 + exp(-logit_p))  # logistic function
+    
+    # Sample weekend occurrence
+    weekend_scenario <- rbinom(N, 1, p_weekend)
+    
+    # Calculate the wait times
+    predicted_wait[,i] <- samples$a_cafe[,i] + 
+      samples$b_cafe[,i] * afternoon_scenario +
+      samples$c_cafe[,i] * weekend_scenario
+  }
+  
+  
+  # Return the mean of predictions across all samples
+  #apply(predicted_wait, 2, mean)
+  return(predicted_wait)
+}
+
+# Generate counterfactual scenarios
+afternoon_always <- rep(1, N)
+afternoon_never <- rep(0, N)
+
+# Generate predictions
+cf_predictions_always <- predict_wait_times(posterior_samples, afternoon_always)
+cf_predictions_never <- predict_wait_times(posterior_samples, afternoon_never)
+
+#
+mean_cafe_0 <- apply(cf_predictions_never, 2, mean)
+mean_cafe_1 <- apply(cf_predictions_always, 2, mean)
+
+plot(mean_cafe_0)
+points(mean_cafe_1,pch=16)
+### Afternoon/ Myein set to 0. To simulate effect of weekend/ACW on W
+
+# Parameters
+n <- 200  # Number of elements in each array
+num_arrays <- 1000  # Number of arrays to generate
+p <- 0.5  # Probability of 1s in the arrays
+
+# Generate the binary arrays
+set.seed(123)  # Ensure reproducibility
+binary_arrays <- replicate(num_arrays, sample(c(0, 1), n, replace = TRUE, prob = c(1 - p, p)))
+
+# Calculate the sums of each array
+array_sums <- colSums(binary_arrays)
+
+predict_wait_times <- function(samples, afternoon_scenario, weekend_scenario) {
+  # Meaning across cafes 
+  # Retrieve the number of posterior samples
+  num_samples <- ncol(samples$a_cafe)
+  N <- nrow(samples$a_cafe)
+  
+  # Compute the predictions for each sample
+  predicted_wait <- matrix(ncol = num_samples, nrow = N)
+  
+  for (i in 1:num_samples) {
+    # Calculate the mediator (weekend) under counterfactual afternoon scenario
+    logit_p <- samples$a_C + samples$b_C * afternoon_scenario
+    p_weekend <- 1 / (1 + exp(-logit_p))  # logistic function
+    
+    # Sample weekend occurrence
+    weekend_scenario <- rbinom(N, 1, p_weekend)
+    
+    # Calculate the wait times
+    predicted_wait[,i] <- samples$a_cafe[,i] + 
+      samples$b_cafe[,i] * afternoon_scenario +
+      samples$c_cafe[,i] * weekend_scenario
+  }
+  
+  
+  # Return the mean of predictions across all samples
+  apply(predicted_wait, 2, mean)
+}
+
+# Afternoon = 0. To delete the DAG from afternoon to both.
+cf_predictions_never <- predict_wait_times(posterior_samples, afternoon_never)
+
+col_list <- split(binary_arrays,col(binary_arrays))
+
+mu_W <- sapply(1:1000, 
+            function(i) predict_wait_times(posterior_samples, afternoon_never,
+                                           binary_arrays[,i])  )
+plot_mat <- rbind( colMeans(mu_W),
+                   colSums(binary_arrays) )
+
+ordered_plot_mat <- plot_mat[ ,order( plot_mat[2,] ) ]
+
+plot(ordered_plot_mat[2,],
+     ordered_plot_mat[1,])
+abline(lm(ordered_plot_mat[1,]~
+            ordered_plot_mat[2,]))
+# Linear decentered 
+# Stan model ####
+stan_linear <-"
+data{
+  vector[36000] GS_std;
+  vector[36000] MY_std;
+  int G[36000];
+}
+parameters{
+  real a;
+  real bMY;
+  real bACW;
+  vector<lower=0>[3] sigma_G;
+  real<lower=0> sigma;
+  cholesky_factor_corr[3] L_rho; // Means Rho matrix is a 3x3 matrix
+  vector[3] z[100];
+}
+
+transformed parameters{
+  vector[100] bMY_G;
+  vector[100] a_G;
+  for ( j in 1:100 ){
+    
+    a_G[j] = a + (diag_pre_multiply(sigma_G, L_rho) * z[j])[1];
+    bMY_G[j] = bMY + (diag_pre_multiply(sigma_G, L_rho) * z[j])[2];
+  } 
+}
+model{
+  vector[36000] mu;
+  L_rho ~ lkj_corr_cholesky( 2 );
+  sigma ~ exponential( 1 );
+  sigma_G ~ exponential( 1 );
+  bMY ~ normal( -0.5 , 0.25 );
+  a ~ normal( 0 , 0.5 );
+  
+  for (i in 1:100) {
+    z[i] ~ normal(0, 1);  // This applies the normal distribution to each 2D vector
+  }
+  
+  for ( i in 1:36000 ) {
+    mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i]  ;
+  }
+  GS_std ~ normal( mu , sigma );
+}
+
+generated quantities{
+  vector[36000] log_lik;
+  vector[36000] mu;
+  matrix[3,3] Rho;
+  Rho = multiply_lower_tri_self_transpose(L_rho);
+  for ( i in 1:36000 ) {
+    mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] ;
+  }
+  for ( i in 1:36000 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );
+}
+"
+stan_model_object <- stanc(model_code = stan_linear)
+model <- stan_model(stanc_ret = stan_model_object)
+fit <- sampling(model, data = d, iter = 2000, chains = 4) #Synthetic
+fit.linear <- sampling(model, data = d_subj2, iter = 2000, chains = 4) # Real
+
 # Model can capture the correlations in synthetic data 
 #### Altered numbers and names, priors also #####
-## Synthetic Data ##
+## Synthetic Data - Mediated ##
 a <- 0 # average morning wait time 
 b <- (-0.5) # average difference afternoon wait time 
-sigma_a <- 0.5 # std dev in intercepts 
-sigma_b <- 0.25 # std dev in slopes 
+c <- (0.5)
 
-sigma_a <- 1   # Std dev in intercepts
-sigma_b <- 0.5 # Std dev in slopes for b_cafe
-sigma_c <- 0.5 # Std dev in slopes for c_cafe
+sigma_a <- 0.5   # Std dev in intercepts
+sigma_b <- 0.25 # Std dev in slopes for b_cafe
+sigma_c <- 0.25 # Std dev in slopes for c_cafe
 rho <- -0.7    # Correlation between intercepts and slopes
 
 Mu <- c(a, b, c)
@@ -329,10 +567,12 @@ parameters{
   real a;
   real bMY;
   real bACW;
+  real a_C;
+  real b_C;
   vector<lower=0>[3] sigma_G;
   real<lower=0> sigma;
   cholesky_factor_corr[3] L_rho; // Means Rho matrix is a 3x3 matrix
-  vector[3] z[3];
+  vector[3] z[100];
 }
 
 transformed parameters{
@@ -346,19 +586,31 @@ transformed parameters{
     bACW_G[j] = bACW + (diag_pre_multiply(sigma_G, L_rho) * z[j])[3];
   } 
 }
+
 model{
   vector[36000] mu;
+  vector[36000] mu_ACW;
   L_rho ~ lkj_corr_cholesky( 2 );
   sigma ~ exponential( 1 );
   sigma_G ~ exponential( 1 );
   bACW ~ normal( 0.5 , 0.25 );
   bMY ~ normal( -0.5 , 0.25 );
   a ~ normal( 0 , 0.5 );
-  
+  a_C ~ normal( 0 , 0.5 );
+  b_C ~ normal( 0 , 0.5 );
+   
   for (i in 1:100) {
     z[i] ~ normal(0, 1);  // This applies the normal distribution to each 2D vector
   }
   
+  // MY -> ACW
+  for ( i in 1:36000 ) {
+   mu_ACW[i] = a_C + b_C * MY_std[i];
+  }
+  
+  ACW_std ~ normal( mu_ACW, sigma );
+  
+  // MY -> GS <- ACW 
   for ( i in 1:36000 ) {
     mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
   }
@@ -378,7 +630,9 @@ generated quantities{
 "
 stan_model_object <- stanc(model_code = stan_mediated)
 model <- stan_model(stanc_ret = stan_model_object)
-fit <- sampling(model, data = d, iter = 2000, chains = 4)
+fit <- sampling(model, data = d, iter = 2000, chains = 4) #Synthetic
+fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4) # Real
+
 
 
 m2 <-  ulam( 
