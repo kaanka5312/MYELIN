@@ -713,49 +713,16 @@ lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[s],0.4))
 shade( apply(GS_sim, 2, PI), xseq,col = col.alpha("gray",0.05))
 }
 
-# Investigating varying parameters 
-with(post,
-     plot(NULL,xlim=c(-2,2),ylim=c(0,10)),
-          for (i in 1:10) {dens(a_G[,i])})
+# One example of posterior predictive check
+library(bayesplot)
 
+pp_check(
+  c(d_subj2$GS_std[1:360]),
+  rstan::extract(fit.mediated, par = 'y_rep')$y_rep[,1:360 ],
+  fun = 'dens_overlay'
+)
 
-for (i in 1:10) {
-  dens<-density(post$bACW_G[,i])
-lines(dens)}
-
-# Counterfactual Plot
-post <- extract.samples(fit.mediated)
-xseq <- seq(from = -2 , to = 2 , length = 100)
-n_samples <- length(post$a_G[,1])
-n_subj <- ncol(post$bACW_G)
-
-GS_cf = matrix(nrow = n_samples, ncol = n_subj )
-for (s in 1:n_subj {
-    
-mu_cf <- post$a_G[,s] + post$bMY_G[,s] * 0 + # 0 is for deleting the arrow from MY to GS
-    post$bACW_G[,s] * xseq  # Using the counterfactual ACW values
-
-GS_cf[,s] = rnorm( mu_cf, sd = post$sigma )
-  
-}
-
-# Total Effect of MY on GS
-ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, a_C + b_C*xseq[i], sigma )
-  ))
-s=1
-GS_sim <- with(post,sapply(1:100,
-                           function(i) rnorm(1e3,  post$a_G[,s] + post$bMY_G[,s] * xseq[i] + 
-                                             post$bACW_G[,s] * ACW_sim[,i])))     
-
-plot(xseq,colMeans(GS_sim), type = "l" )
-
-s=1
-plot_dat <- with(post, sapply(1:30,
-                  function(i) rnorm(1e3,  post$a_G[,s] + post$bMY_G[,s] * 0 + # 0 is for deleting the arrow from MY to GS
-                                    post$bACW_G[,s] * xseq[i])))
-
-plot(xseq, colMeans(plot_dat), type ="l" )
-
+#
 
 # N O T E ! 
 # There is nothing wrong with above multi - normal model. Only problem is 
