@@ -321,7 +321,8 @@ model{
     z[i] ~ normal(0, 1);  // This applies the normal distribution to each 2D vector
   }
 
- // Weekend is binary variable, thus bernoulli logit is used
+ // Weekend is binary variable, thus bernoulli logit is used. This line consideres weekend
+ // is related to afternoon and become mediator
   for ( i in 1: 200 ) {
    weekend[i] ~ bernoulli_logit(a_C + b_C * afternoon[i]);
   }
@@ -349,6 +350,11 @@ stan_model_object <- stanc(model_code = stan_code)
 model <- stan_model(stanc_ret = stan_model_object)
 fit <- sampling(model, data = d, iter = 2000, chains = 4)
 
+###########################################################
+#################  T O Y  E X A M P L E  ##################
+###########################################################
+
+# This part creates several counterfactual plots in mediated model of cafes.
 # Counterfactual 
 posterior_samples <- extract(fit)
 # Manual computation of the predicted outcomes
@@ -393,6 +399,7 @@ cf_predictions_never <- predict_wait_times(posterior_samples, afternoon_never)
 mean_cafe_0 <- apply(cf_predictions_never, 2, mean)
 mean_cafe_1 <- apply(cf_predictions_always, 2, mean)
 
+# Shows difference between all afternoon or never, for each cafe
 plot(mean_cafe_0)
 points(mean_cafe_1,pch=16)
 ### Afternoon/ Myein set to 0. To simulate effect of weekend/ACW on W
@@ -454,7 +461,11 @@ plot(ordered_plot_mat[2,],
      ordered_plot_mat[1,])
 abline(lm(ordered_plot_mat[1,]~
             ordered_plot_mat[2,]))
-# Linear decentered 
+#############################################################
+#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=#=                
+
+######## L I N E A R    D E C E N T E R E D ################
+# Model that only makes MY -> GSCORR               
 # Stan model ####
 stan_linear <-"
 data{
@@ -515,6 +526,8 @@ model <- stan_model(stanc_ret = stan_model_object)
 fit <- sampling(model, data = d, iter = 2000, chains = 4) #Synthetic
 fit.linear <- sampling(model, data = d_subj2, iter = 2000, chains = 4) # Real
 
+
+######## M E D I A T E D   D E C E N T E R E D ################               
 # Model can capture the correlations in synthetic data 
 #### Altered numbers and names, priors also #####
 ## Synthetic Data - Mediated ##
@@ -656,22 +669,48 @@ generated quantities{
 stan_model_object <- stanc(model_code = stan_syn)
 model <- stan_model(stanc_ret = stan_model_object)
 fit <- sampling(model, data = d, iter = 2000, chains = 4, cores= 4) #Synthetic
-#fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4, cores= 6) # Real
-# CF
-post <- extract.samples(fit)
-s=2
+fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4, cores= 6) # Real
 
-ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, aC_G[,1] + bC_G[,1]*xseq[i], sigma_ACW )
+post <- extract.samples(fit.mediated)
+xseq <- seq(from = -2 , to = 2 , length = 100)
+colors <- rainbow(100) # Generate distinct colors
+
+# Counter-factual plot that showing relation between MY -> ACW, controlling MY               
+plot(NULL,type = "l", ylim= c(-2.5,2.5),xlim=c(-2.5,2.5),
+     xlab = "Standardized Myelin", ylab = "Standardized ACW", main= "Counterfactual Plot")
+for (s in 1:100) {
+  ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, aC_G[,s] + bC_G[,s]*xseq[i], sigma_2 )
+  ))
+  lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[s],0.4)) 
+  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha("gray",0.05))
+}
+
+# Total Effect of MY on GSCORR               
+plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
+     xlab = "Standardized Myelin", ylab = "Standardized GSCORR", main = "Total Effect of MY on GSCORR",sub= "Counterfactual Plot")
+for (s in 1:100) {
+ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, aC_G[,s] + bC_G[,s]*xseq[i], sigma_2 )
 ))
-plot(xseq,colMeans(ACW_sim), type = "l", ylim= c(-2,2))
-shade( apply(ACW_sim, 2, PI), xseq)
+#lines(xseq, y = colMeans(ACW_sim)) 
+#shade( apply(ACW_sim, 2, PI), xseq)
 
-GS_sim <- with(post,sapply(1:100,
-                           function(i) rnorm(1e3,  post$a_G[,s] + post$bMY_G[,s] * xseq[i] + 
-                                               post$bACW_G[,s] * ACW_sim[,i])))     
+GS_sim <- sapply(1:100, function(i) rnorm(1e3, post$a_G[,s] + post$bMY_G[,s] * xseq[i] + 
+                                            post$bACW_G[,s] * ACW_sim[,i],post$sigma))     
 
-plot(xseq,colMeans(GS_sim), type = "l", ylim= c(-2,2) )
-shade( apply(GS_sim, 2, PI), xseq)
+lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[s],0.4)) 
+shade( apply(GS_sim, 2, PI), xseq,col = col.alpha("gray",0.05))
+}
+
+# Counter-factual Plot
+
+plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
+     xlab = "Standardized ACW", ylab = "Standardized GSCORR", main = "Counterfacted relationship")
+for (s in 1:100) {
+GS_sim <- sapply(1:100, function(i) rnorm(1e3, post$a_G[,s] + post$bMY_G[,s] * 0 + 
+                                              post$bACW_G[,s] * xseq[i], post$sigma))     
+lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[s],0.4)) 
+shade( apply(GS_sim, 2, PI), xseq,col = col.alpha("gray",0.05))
+}
 
 # Investigating varying parameters 
 with(post,
