@@ -207,7 +207,7 @@ wait <- rnorm(N_visits * N_cafes, mu, sigma)
 d <- data.frame(cafe = cafe_id, afternoon = afternoon, weekend = weekend, wait = wait)
 
 ### Stan Model ###
-# MY -> GS <- ACW 
+# Only MY -> GS <- ACW 
 stan_code <-" 
 data{
   vector[200] wait;
@@ -270,6 +270,8 @@ generated quantities{
   for ( i in 1:200 ) log_lik[i] = normal_lpdf( wait[i] | mu[i] , sigma );
 }
 "
+# This model has both:
+# MY -> ACW
 # MY -> GS <- ACW 
 stan_code <-" 
 data{
@@ -318,7 +320,8 @@ model{
   for (i in 1:20) {
     z[i] ~ normal(0, 1);  // This applies the normal distribution to each 2D vector
   }
-  
+
+ // Weekend is binary variable, thus bernoulli logit is used
   for ( i in 1: 200 ) {
    weekend[i] ~ bernoulli_logit(a_C + b_C * afternoon[i]);
   }
