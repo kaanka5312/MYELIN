@@ -533,7 +533,7 @@ Rho <- matrix(c(1, rho, rho,
 # Now matrix multiply to get covariance matrix
 Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
 
-N_cafes <- 100
+N_cafes <- 10
 library(MASS)
 set.seed(5)
 vary_effects <- mvrnorm(N_cafes, Mu, Sigma)
@@ -543,7 +543,7 @@ b_cafe <- vary_effects[, 2]
 c_cafe <- vary_effects[, 3]
 
 set.seed(22)
-N_visits <- 360
+N_visits <- 36
 afternoon <- rep(0:1, N_visits * N_cafes / 2) * rnorm( N_visits*N_cafes )
 # New covariate, e.g., weekend or not
 weekend <- sample(0:1, N_visits * N_cafes, replace = TRUE) * rnorm( N_visits*N_cafes )  
@@ -556,106 +556,163 @@ wait <- rnorm(N_visits * N_cafes, mu, sigma)
 d <- data.frame(G=cafe_id, MY_std = afternoon, ACW_std = weekend, GS_std = wait)
 
 # Stan model ####
-stan_mediated <-"
+stan_syn <-"
 data{
-  vector[36000] GS_std;
-  vector[36000] MY_std;
-  vector[36000] ACW_std;
-  int G[36000];
+  vector[360] GS_std;
+  vector[360] MY_std;
+  vector[360] ACW_std;
+  int G[360];
 }
 parameters{
   real a;
+  real aC;
   real bMY;
   real bACW;
   real a_C;
   real b_C;
+  real bC;
   vector<lower=0>[3] sigma_G;
   real<lower=0> sigma;
-  cholesky_factor_corr[3] L_rho; // Means Rho matrix is a 3x3 matrix
-  vector[3] z[100];
+  vector<lower=0>[2] sigma_ACW;
+  real<lower=0> sigma_2;
+  cholesky_factor_corr[3] L_med; // Means Rho matrix is a 3x3 matrix
+  cholesky_factor_corr[2] L_dir; // Means Rho matrix is a 2x2 matrix
+  vector[3] z_med[10];
+  vector[2] z_dir[10];
 }
 
 transformed parameters{
-  vector[100] bACW_G;
-  vector[100] bMY_G;
-  vector[100] a_G;
-  for ( j in 1:100 ){
-    
-    a_G[j] = a + (diag_pre_multiply(sigma_G, L_rho) * z[j])[1];
-    bMY_G[j] = bMY + (diag_pre_multiply(sigma_G, L_rho) * z[j])[2];
-    bACW_G[j] = bACW + (diag_pre_multiply(sigma_G, L_rho) * z[j])[3];
+  vector[10] bACW_G;
+  vector[10] bMY_G;
+  vector[10] a_G;
+  for ( j in 1:10 ){
+    a_G[j] = a + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[1];
+    bMY_G[j] = bMY + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[2];
+    bACW_G[j] = bACW + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[3];
+  } 
+  
+  vector[10] bC_G;
+  vector[10] aC_G;
+  for ( j in 1:10 ){
+    aC_G[j] = aC + (diag_pre_multiply(sigma_ACW, L_dir) * z_dir[j])[1];
+    bC_G[j] = bC + (diag_pre_multiply(sigma_ACW, L_dir) * z_dir[j])[2];
   } 
 }
 
 model{
-  vector[36000] mu;
-  vector[36000] mu_ACW;
-  L_rho ~ lkj_corr_cholesky( 2 );
+  vector[360] mu;
+  vector[360] mu_ACW;
+  
+  L_med ~ lkj_corr_cholesky( 2 );
+  L_dir ~lkj_corr_cholesky( 2 );
+  
   sigma ~ exponential( 1 );
   sigma_G ~ exponential( 1 );
+  sigma_ACW ~ exponential( 1 );
+  
   bACW ~ normal( 0.5 , 0.25 );
   bMY ~ normal( -0.5 , 0.25 );
+  
   a ~ normal( 0 , 0.5 );
-  a_C ~ normal( 0 , 0.5 );
-  b_C ~ normal( 0 , 0.5 );
+  aC ~ normal( 0 , 0.5 );
+  bC ~ normal( 0 , 0.5 );
+  
    
-  for (i in 1:100) {
-    z[i] ~ normal(0, 1);  // This applies the normal distribution to each 2D vector
+  for (i in 1:10) {
+    z_med[i] ~ normal(0, 1); 
+    z_dir[i] ~ normal(0, 1);// This applies the normal distribution to each 2D vector
   }
   
-  // MY -> ACW
-  for ( i in 1:36000 ) {
-   mu_ACW[i] = a_C + b_C * MY_std[i];
-  }
-  
-  ACW_std ~ normal( mu_ACW, sigma );
-  
-  // MY -> GS <- ACW 
-  for ( i in 1:36000 ) {
-    mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
-  }
-  GS_std ~ normal( mu , sigma );
+    // MY -> ACW
+    for ( i in 1:360 ) {
+     mu_ACW[i] = aC_G[G[i]] + bC_G[G[i]] * MY_std[i];
+    }
+    
+    ACW_std ~ normal( mu_ACW, sigma_2 );
+    
+    // MY -> GS <- ACW 
+    for ( i in 1:360 ) {
+      mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
+    }
+    GS_std ~ normal( mu , sigma );
 }
 
 generated quantities{
-  vector[36000] log_lik;
-  vector[36000] mu;
-  matrix[3,3] Rho;
-  Rho = multiply_lower_tri_self_transpose(L_rho);
-  for ( i in 1:36000 ) {
+  vector[360] log_lik;
+  vector[360] mu;
+  matrix[3,3] Rho_med;
+  matrix[2,2] Rho_dir;
+  Rho_med = multiply_lower_tri_self_transpose(L_med);
+  Rho_dir = multiply_lower_tri_self_transpose(L_dir);
+  for ( i in 1:360 ) {
     mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
   }
-  for ( i in 1:36000 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );
+  for ( i in 1:360 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );
 }
 "
-stan_model_object <- stanc(model_code = stan_mediated)
+stan_model_object <- stanc(model_code = stan_syn)
 model <- stan_model(stanc_ret = stan_model_object)
 fit <- sampling(model, data = d, iter = 2000, chains = 4) #Synthetic
-fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4) # Real
+#fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4) # Real
+# CF
+post <- extract.samples(fit)
+s=2
+
+ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, aC_G[,1] + bC_G[,1]*xseq[i], sigma_ACW )
+))
+plot(xseq,colMeans(ACW_sim), type = "l", ylim= c(-2,2))
+shade( apply(ACW_sim, 2, PI), xseq)
+
+GS_sim <- with(post,sapply(1:100,
+                           function(i) rnorm(1e3,  post$a_G[,s] + post$bMY_G[,s] * xseq[i] + 
+                                               post$bACW_G[,s] * ACW_sim[,i])))     
+
+plot(xseq,colMeans(GS_sim), type = "l", ylim= c(-2,2) )
+shade( apply(GS_sim, 2, PI), xseq)
+
+# Investigating varying parameters 
+with(post,
+     plot(NULL,xlim=c(-2,2),ylim=c(0,10)),
+          for (i in 1:10) {dens(a_G[,i])})
 
 
+for (i in 1:10) {
+  dens<-density(post$bACW_G[,i])
+lines(dens)}
 
-m2 <-  ulam( 
-  alist( 
-    # Likelihood
-    GS_std ~ dnorm( mu , sigma ) , 
-    mu <- a_G[G] + bMY_G[G] * MY_std + bACW[G] * ACW_std,
+# Counterfactual Plot
+post <- extract.samples(fit.mediated)
+xseq <- seq(from = -2 , to = 2 , length = 100)
+n_samples <- length(post$a_G[,1])
+n_subj <- ncol(post$bACW_G)
+
+GS_cf = matrix(nrow = n_samples, ncol = n_subj )
+for (s in 1:n_subj {
     
-    # Adaptive priors
-    c(a_G,bMY_G)[G] ~ multi_normal( c(a,bMY), Rho, sigma_G) ,
-    #vector[4]:c(a_G[G],bMY_G[G]) ~ multi_normal( c(a,bMY), Rho, sigma_G) ,
-    #vector[2]:bMY_G[G] ~ multi_normal( 0, Rho, sigma_G) ,
-    
-    # Fixed priors
-    a ~ normal(0,0.5) , 
-    bMY ~ normal(-0.5,0.25) , 
-    bACW[G] ~ dnorm(-0.5,0.25), # ACW added as a fixed prior
-    sigma_ACW ~ exponential(1),
-    sigma_G ~ exponential(1), 
-    sigma ~ exponential(1), 
-    Rho ~ lkj_corr(2)
-    ) , 
-  data = d_subj2, chains = 4, cores = 4, log_lik = TRUE, iter = 4000) 
+mu_cf <- post$a_G[,s] + post$bMY_G[,s] * 0 + # 0 is for deleting the arrow from MY to GS
+    post$bACW_G[,s] * xseq  # Using the counterfactual ACW values
+
+GS_cf[,s] = rnorm( mu_cf, sd = post$sigma )
+  
+}
+
+# Total Effect of MY on GS
+ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, a_C + b_C*xseq[i], sigma )
+  ))
+s=1
+GS_sim <- with(post,sapply(1:100,
+                           function(i) rnorm(1e3,  post$a_G[,s] + post$bMY_G[,s] * xseq[i] + 
+                                             post$bACW_G[,s] * ACW_sim[,i])))     
+
+plot(xseq,colMeans(GS_sim), type = "l" )
+
+s=1
+plot_dat <- with(post, sapply(1:30,
+                  function(i) rnorm(1e3,  post$a_G[,s] + post$bMY_G[,s] * 0 + # 0 is for deleting the arrow from MY to GS
+                                    post$bACW_G[,s] * xseq[i])))
+
+plot(xseq, colMeans(plot_dat), type ="l" )
+
 
 # N O T E ! 
 # There is nothing wrong with above multi - normal model. Only problem is 
