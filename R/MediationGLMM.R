@@ -558,10 +558,10 @@ d <- data.frame(G=cafe_id, MY_std = afternoon, ACW_std = weekend, GS_std = wait)
 # Stan model ####
 stan_syn <-"
 data{
-  vector[360] GS_std;
-  vector[360] MY_std;
-  vector[360] ACW_std;
-  int G[360];
+  vector[36000] GS_std;
+  vector[36000] MY_std;
+  vector[36000] ACW_std;
+  int G[36000];
 }
 parameters{
   real a;
@@ -577,31 +577,31 @@ parameters{
   real<lower=0> sigma_2;
   cholesky_factor_corr[3] L_med; // Means Rho matrix is a 3x3 matrix
   cholesky_factor_corr[2] L_dir; // Means Rho matrix is a 2x2 matrix
-  vector[3] z_med[10];
-  vector[2] z_dir[10];
+  vector[3] z_med[100];
+  vector[2] z_dir[100];
 }
 
 transformed parameters{
-  vector[10] bACW_G;
-  vector[10] bMY_G;
-  vector[10] a_G;
-  for ( j in 1:10 ){
+  vector[100] bACW_G;
+  vector[100] bMY_G;
+  vector[100] a_G;
+  for ( j in 1:100 ){
     a_G[j] = a + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[1];
     bMY_G[j] = bMY + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[2];
     bACW_G[j] = bACW + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[3];
   } 
   
-  vector[10] bC_G;
-  vector[10] aC_G;
-  for ( j in 1:10 ){
+  vector[100] bC_G;
+  vector[100] aC_G;
+  for ( j in 1:100 ){
     aC_G[j] = aC + (diag_pre_multiply(sigma_ACW, L_dir) * z_dir[j])[1];
     bC_G[j] = bC + (diag_pre_multiply(sigma_ACW, L_dir) * z_dir[j])[2];
   } 
 }
 
 model{
-  vector[360] mu;
-  vector[360] mu_ACW;
+  vector[36000] mu;
+  vector[36000] mu_ACW;
   
   L_med ~ lkj_corr_cholesky( 2 );
   L_dir ~lkj_corr_cholesky( 2 );
@@ -618,36 +618,36 @@ model{
   bC ~ normal( 0 , 0.5 );
   
    
-  for (i in 1:10) {
+  for (i in 1:100) {
     z_med[i] ~ normal(0, 1); 
     z_dir[i] ~ normal(0, 1);// This applies the normal distribution to each 2D vector
   }
   
     // MY -> ACW
-    for ( i in 1:360 ) {
+    for ( i in 1:36000 ) {
      mu_ACW[i] = aC_G[G[i]] + bC_G[G[i]] * MY_std[i];
     }
     
     ACW_std ~ normal( mu_ACW, sigma_2 );
     
     // MY -> GS <- ACW 
-    for ( i in 1:360 ) {
+    for ( i in 1:36000 ) {
       mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
     }
     GS_std ~ normal( mu , sigma );
 }
 
 generated quantities{
-  vector[360] log_lik;
-  vector[360] mu;
+  vector[36000] log_lik;
+  vector[36000] mu;
   matrix[3,3] Rho_med;
   matrix[2,2] Rho_dir;
   Rho_med = multiply_lower_tri_self_transpose(L_med);
   Rho_dir = multiply_lower_tri_self_transpose(L_dir);
-  for ( i in 1:360 ) {
+  for ( i in 1:36000 ) {
     mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
   }
-  for ( i in 1:360 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );
+  for ( i in 1:36000 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );
 }
 "
 stan_model_object <- stanc(model_code = stan_syn)
