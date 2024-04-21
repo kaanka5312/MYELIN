@@ -664,11 +664,12 @@ generated quantities{
     mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
   }
   for ( i in 1:36000 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );
+  array[36000] real y_rep = normal_rng(mu, sigma);
 }
 "
 stan_model_object <- stanc(model_code = stan_syn)
 model <- stan_model(stanc_ret = stan_model_object)
-fit <- sampling(model, data = d, iter = 2000, chains = 4, cores= 4) #Synthetic
+#fit <- sampling(model, data = d, iter = 2000, chains = 4, cores= 4) #Synthetic
 fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4, cores= 6) # Real
 
 post <- extract.samples(fit.mediated)
