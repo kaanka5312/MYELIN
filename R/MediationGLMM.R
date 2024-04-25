@@ -542,10 +542,10 @@ rho <- -0.7    # Correlation between intercepts and slopes
 
 Mu <- c(a, b, c)
 sigmas <- c(sigma_a, sigma_b, sigma_c)
-Rho <- matrix(c(1, rho, rho,
+Rho_med <- matrix(c(1, rho, rho,
                 rho, 1, 0,   # Assuming b_cafe and c_cafe are uncorrelated
                 rho, 0, 1), nrow=3)  # Correlation matrix
-
+Rho_dir <- matrix(c(1, rho, rho, 1), nrow=2)
 # Now matrix multiply to get covariance matrix
 Sigma <- diag(sigmas) %*% Rho %*% diag(sigmas)
 
@@ -570,6 +570,161 @@ sigma <- 0.5
 wait <- rnorm(N_visits * N_cafes, mu, sigma)
 
 d <- data.frame(G=cafe_id, MY_std = afternoon, ACW_std = weekend, GS_std = wait)
+# Synthetic data
+## Synthetic Data - Mediated ##
+a <- 0 # average GSCORR
+ac <- 0 # average ACW between ACW-MY
+b <- (-0.5) # average difference in myelin
+bc <- 0
+c <- (0.5) # average difference in ACW
+
+sigma_a <- 0.5   # Std dev in intercepts
+sigma_ac <- 0.5
+sigma_b <- 0.25 # Std dev in slopes for b_cafe
+sigma_c <- 0.25 # Std dev in slopes for c_cafe
+sigma_bc <- 0.5
+rho <- -0.7    # Correlation between intercepts and slopes
+
+Mu_med <- c(a, b, c)
+Mu_dir <- c(ac, bc)
+
+sigmas_med <- c(sigma_a, sigma_b, sigma_c)
+sigmas_dir <- c(sigma_ac, sigma_bc )
+
+Rho_med <- matrix(c(1, rho, rho,
+                rho, 1, 0,   # Assuming b_cafe and c_cafe are uncorrelated
+                rho, 0, 1), nrow=3)  # Correlation matrix
+Rho_dir <- matrix(c(1, rho, rho, 1), nrow=2)
+# Now matrix multiply to get covariance matrix
+Sigma_med <- diag(sigmas_med) %*% Rho_med %*% diag(sigmas_med)
+Sigma_dir <- diag(sigmas_dir) %*% Rho_dir %*% diag(sigmas_dir)
+
+n_subj <- 10
+n_regions <- 36
+
+library(MASS)
+set.seed(5)
+vary_effects <- mvrnorm(n_subj, Mu_med, Sigma_med)
+
+a_subj <- vary_effects[, 1]
+b_subj <- vary_effects[, 2]
+c_subj <- vary_effects[, 3]
+
+vary_effects <- mvrnorm(n_subj, Mu_dir, Sigma_dir)
+
+ac_subj <- vary_effects[, 1]
+bc_subj <- vary_effects[, 2]
+
+subj_id <- rep(1:n_subj, each = n_regions)
+
+# Direct
+MY_std <- rnorm(n_subj*n_regions)
+mu_ACW <- ac_subj[subj_id] + bc_subj * MY_std
+sigma <- 0.5
+ACW_std <- rnorm(n_subj * n_regions, mu_ACW, sigma)
+
+# indirect
+mu <- a_subj[subj_id] + b_subj[subj_id] * MY_std + c_subj[subj_id] * ACW_std
+GS_std <- rnorm(n_subj * n_regions, mu, sigma)
+
+d <- data.frame(G=subj_id, MY_std = MY_std, ACW_std = ACW_std, GS_std = GS_std)
+# Synthetic 
+stan_syn <-"
+data{
+  vector[360] GS_std;
+  vector[360] MY_std;
+  vector[360] ACW_std;
+  int G[360];
+}
+parameters{
+  real a;
+  real aC;
+  real bMY;
+  real bACW;
+  real a_C;
+  real b_C;
+  real bC;
+  vector<lower=0>[3] sigma_G;
+  real<lower=0> sigma;
+  vector<lower=0>[2] sigma_ACW;
+  real<lower=0> sigma_2;
+  cholesky_factor_corr[3] L_med; // Means Rho matrix is a 3x3 matrix
+  cholesky_factor_corr[2] L_dir; // Means Rho matrix is a 2x2 matrix
+  vector[3] z_med[100];
+  vector[2] z_dir[100];
+}
+
+transformed parameters{
+  vector[10] bACW_G;
+  vector[10] bMY_G;
+  vector[10] a_G;
+  for ( j in 1:10 ){
+    a_G[j] = a + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[1];
+    bMY_G[j] = bMY + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[2];
+    bACW_G[j] = bACW + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[3];
+  } 
+  
+  vector[10] bC_G;
+  vector[10] aC_G;
+  for ( j in 1:10 ){
+    aC_G[j] = aC + (diag_pre_multiply(sigma_ACW, L_dir) * z_dir[j])[1];
+    bC_G[j] = bC + (diag_pre_multiply(sigma_ACW, L_dir) * z_dir[j])[2];
+  } 
+}
+
+model{
+  vector[360] mu;
+  vector[360] mu_ACW;
+  
+  L_med ~ lkj_corr_cholesky( 2 );
+  L_dir ~lkj_corr_cholesky( 2 );
+  
+  sigma ~ exponential( 1 );
+  sigma_G ~ exponential( 1 );
+  sigma_ACW ~ exponential( 1 );
+  
+  bACW ~ normal( 0.5 , 0.25 );
+  bMY ~ normal( -0.5 , 0.25 );
+  
+  a ~ normal( 0 , 0.5 );
+  aC ~ normal( 0 , 0.5 );
+  bC ~ normal( 0 , 0.5 );
+  
+   
+  for (i in 1:10) {
+    z_med[i] ~ normal(0, 1); 
+    z_dir[i] ~ normal(0, 1);// This applies the normal distribution to each 2D vector
+  }
+  
+    // MY -> ACW
+    for ( i in 1:360 ) {
+     mu_ACW[i] = aC_G[G[i]] + bC_G[G[i]] * MY_std[i];
+    }
+    
+    ACW_std ~ normal( mu_ACW, sigma_2 );
+    
+    // MY -> GS <- ACW 
+    for ( i in 1:360 ) {
+      mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
+    }
+    GS_std ~ normal( mu , sigma );
+}
+
+generated quantities{
+  vector[360] mu;
+  matrix[3,3] Rho_med;
+  matrix[2,2] Rho_dir;
+  Rho_med = multiply_lower_tri_self_transpose(L_med);
+  Rho_dir = multiply_lower_tri_self_transpose(L_dir);
+  for ( i in 1:360 ) {
+    mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
+  }
+}
+
+"
+stan_model_object <- stanc(model_code = stan_syn)
+model <- stan_model(stanc_ret = stan_model_object)
+fit <- sampling(model, data = d, iter = 2000, chains = 4, cores= 4) #Synthetic
 
 # Stan model ####
 stan_syn <-"
@@ -674,12 +829,12 @@ fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4, cores= 
 
 post <- extract.samples(fit.mediated)
 xseq <- seq(from = -2 , to = 2 , length = 100)
-colors <- rainbow(100) # Generate distinct colors
+colors <- rainbow(10) # Generate distinct colors
 
 # Counter-factual plot that showing relation between MY -> ACW, controlling MY               
 plot(NULL,type = "l", ylim= c(-2.5,2.5),xlim=c(-2.5,2.5),
      xlab = "Standardized Myelin", ylab = "Standardized ACW", main= "Counterfactual Plot")
-for (s in 1:100) {
+for (s in 1:10) {
   ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, aC_G[,s] + bC_G[,s]*xseq[i], sigma_2 )
   ))
   lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[s],0.4)) 
@@ -689,7 +844,7 @@ for (s in 1:100) {
 # Total Effect of MY on GSCORR               
 plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
      xlab = "Standardized Myelin", ylab = "Standardized GSCORR", main = "Total Effect of MY on GSCORR",sub= "Counterfactual Plot")
-for (s in 1:100) {
+for (s in 1:10) {
 ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, aC_G[,s] + bC_G[,s]*xseq[i], sigma_2 )
 ))
 #lines(xseq, y = colMeans(ACW_sim)) 
@@ -706,7 +861,7 @@ shade( apply(GS_sim, 2, PI), xseq,col = col.alpha("gray",0.05))
 
 plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
      xlab = "Standardized ACW", ylab = "Standardized GSCORR", main = "Counterfacted relationship")
-for (s in 1:100) {
+for (s in 1:10) {
 GS_sim <- sapply(1:100, function(i) rnorm(1e3, post$a_G[,s] + post$bMY_G[,s] * 0 + 
                                               post$bACW_G[,s] * xseq[i], post$sigma))     
 lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[s],0.4)) 
@@ -722,6 +877,13 @@ pp_check(
   fun = 'dens_overlay'
 )
 
+
+mediated <- dagitty( "dag{ 
+Myelin->ACW -> GSCORR 
+Myelin -> GSCORR }" ) 
+coordinates(mediated) <- list( x=c(Myelin=0,ACW=1,GSCORR=2) , y=c(Myelin=0.5,ACW= -1,GSCORR=0.5) ) 
+
+drawdag(mediated)
 #
 
 # N O T E ! 
@@ -794,7 +956,7 @@ library(rethinking)
 # Prior and posterior correlation
 post <- extract.samples( m1 )
 
-dens( post$Rho[,1,2] , xlim=c(-1,1) ) # posterior
+dens( post$Rho_med[,1,2] , xlim=c(-1,1) ) # posterior
 R <- rlkjcorr( 1e4 , K=2 , eta=2 ) # prior
 dens( R[,1,2] , add=TRUE , lty=2 )
 

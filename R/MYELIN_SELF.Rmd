@@ -75,7 +75,7 @@ scale_fill_brain2(palette=c("#4DBBD5FF", "#E64B35FF")) +
         axis.text.y = element_blank())
 
 ####### REGION-WISE ##################
-test <- readMat("E:/EIB/MATLAB_ClassificationApp/MED.mat")
+test <- readMat("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/MED.mat")
 
 RegWise <- data.frame(test$MED)
 colnames(RegWise) <- c("GS","ACW","MY","H","G_1","G_2")
@@ -624,12 +624,20 @@ linear<- ulam(
 
 mediated<- ulam( 
   alist( 
+    # MY -> GS <- ACW
     GS_std ~ dnorm( mu , sigma ) , 
     mu <- a[G] + bACW[G] * ACW_std + bMY[G] * MY_std ,
     a[G] ~ dnorm( 0, 0.15 ) , 
     bACW[G] ~ dnorm( 0 , 0.27 ) ,
     bMY[G] ~ dnorm( 0 , 0.27 ) ,
-    sigma ~ dexp( 1 ) ) , 
+    sigma ~ dexp( 1 )  ,
+    
+    # MY -> ACW
+    ACW_std ~ dnorm( mu_ACW, sigma_ACW ) ,
+    mu_ACW <- a_ACW[G] + bMYACW[G] * MY_std ,
+    a_ACW[G] ~ dnorm( 0, 0.25 ) ,
+    bMYACW[G] ~ dnorm( 0, 0.5 ) ,
+    sigma_ACW ~ dexp( 1 ) ),
   data=d_2, chains = 4, cores = 4, log_lik = TRUE) 
 
 # Priors 
@@ -661,7 +669,7 @@ png("E:/EIB/FIGURES/prior_m.png", width = 1080, height = 600, res = 150)
 par(pty="s")
 plot( NULL , xlim=c(-2,2) , ylim=c(-2,2),
       xlab="Standardized Myelin and ACW", ylab="GSCORR", main= "Possible prior relationship",cex.lab = 1.5, cex.main = 2, asp=1) 
-for ( i in 1:100 ) lines( c(-2,2) , M_m[i,] , col=col.alpha("black",0.4), lwd=2  )
+for ( i in 1:100 ) lines( c(-2,2) , M_m$mu_ACW[i,] , col=col.alpha("black",0.4), lwd=2  )
 
 dev.off() 
   
@@ -680,10 +688,10 @@ png("E:/EIB/FIGURES/high_resolution_plot.png", width = 800, height = 800, res = 
 
 coef <- coeftab(linear,mediated)
 
-RowNames <- c("a[nonself]", "a[self]", "bMY[nonself]", "bMY[self]", "sigma", "bACW[nonself]", "bACW[self]" )
+RowNames <- c("bMY[nonself]", "bMY[self]", "bACW[nonself]", "bACW[self]", "bMY_ACW[nonself]", "bMY_ACW[self]" )
 
+coef@coefs <- coef@coefs[c(3,4,6,7,10,11),]
 rownames(coef@coefs) <- RowNames
-coef@coefs <- coef@coefs[c(3,4,6,7),]
 
 plot( coef,
       xlab="Beta Estimates", 
@@ -692,7 +700,7 @@ plot( coef,
       cex.main = 1.5,
       col = c("red"))
 
-text(x = -1, y = 18, labels = "(C)", xpd = NA, cex=2, font=2)
+#text(x = -1, y = 18, labels = "(C)", xpd = NA, cex=2, font=2)
 
 #legend( "topright",
 #        legend = c( "1 = Nonself", "2 = Self" )
