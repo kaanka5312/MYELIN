@@ -570,21 +570,23 @@ sigma <- 0.5
 wait <- rnorm(N_visits * N_cafes, mu, sigma)
 
 d <- data.frame(G=cafe_id, MY_std = afternoon, ACW_std = weekend, GS_std = wait)
-# Synthetic data
+# Synthetic data appropriate to the data
 ## Synthetic Data - Mediated ##
 a <- 0 # average GSCORR
 ac <- 0 # average ACW between ACW-MY
 b <- (-0.5) # average difference in myelin
 
-bc <- 0
+bc <- 0.5 # Direct effect of MY_std on ACW_std
 c <- (0.5) # average difference in ACW
 
 sigma_a <- 0.5   # Std dev in intercepts
 sigma_ac <- 0.5
 sigma_b <- 0.25 # Std dev in slopes for b_cafe
 sigma_c <- 0.25 # Std dev in slopes for c_cafe
-sigma_bc <- 0.5
-rho <- -0.7    # Correlation between intercepts and slopes
+sigma_bc <- 0.25
+
+rho_med <- -0.7    # Correlation between intercepts and slopes
+rho_dir <- 0.3
 
 Mu_med <- c(a, b, c)
 Mu_dir <- c(ac, bc)
@@ -592,16 +594,17 @@ Mu_dir <- c(ac, bc)
 sigmas_med <- c(sigma_a, sigma_b, sigma_c)
 sigmas_dir <- c(sigma_ac, sigma_bc )
 
-Rho_med <- matrix(c(1, rho, rho,
-                rho, 1, 0,   # Assuming b_cafe and c_cafe are uncorrelated
-                rho, 0, 1), nrow=3)  # Correlation matrix
-Rho_dir <- matrix(c(1, rho, rho, 1), nrow=2)
+Rho_med <- matrix(c(1, rho_med, rho_med,
+                    rho_med, 1, 0,   # Assuming b_cafe and c_cafe are uncorrelated
+                    rho_med, 0, 1), nrow=3)  # Correlation matrix
+Rho_dir <- matrix(c(1, rho_dir, rho_dir, 1), nrow=2)
 # Now matrix multiply to get covariance matrix
 Sigma_med <- diag(sigmas_med) %*% Rho_med %*% diag(sigmas_med)
 Sigma_dir <- diag(sigmas_dir) %*% Rho_dir %*% diag(sigmas_dir)
 
-n_subj <- 10
-n_regions <- 36
+n_subj <- 100
+n_regions <- 360
+G <- rep(test$MED[,5], n_subj)
 
 library(MASS)
 set.seed(5)
@@ -620,120 +623,33 @@ subj_id <- rep(1:n_subj, each = n_regions)
 
 # Direct
 MY_std <- rnorm(n_subj*n_regions)
-mu_ACW <- ac_subj[subj_id] + bc_subj * MY_std
+mu_ACW <- ac_subj[subj_id] + bc_subj[subj_id] * MY_std
 sigma <- 0.5
 ACW_std <- rnorm(n_subj * n_regions, mu_ACW, sigma)
 
-# indirect
+# Includes direct effect of MY
 mu <- a_subj[subj_id] + b_subj[subj_id] * MY_std + c_subj[subj_id] * ACW_std
+# For MY -> ACW -> GS. Indirect
+#mu <- a_subj[subj_id] + c_subj[subj_id] * ACW_std 
 GS_std <- rnorm(n_subj * n_regions, mu, sigma)
 
-d <- data.frame(G=subj_id, MY_std = MY_std, ACW_std = ACW_std, GS_std = GS_std)
+d <- list(n_subj = n_subj, 
+          n_regions = n_regions, 
+          G=subj_id, 
+          MY_std = MY_std * (G-1), 
+          ACW_std = ACW_std * (G-1) , 
+          GS_std = GS_std)
+
 # Synthetic 
-stan_syn <-"
-data{
-  vector[360] GS_std;
-  vector[360] MY_std;
-  vector[360] ACW_std;
-  int G[360];
-}
-parameters{
-  real a;
-  real aC;
-  real bMY;
-  real bACW;
-  real a_C;
-  real b_C;
-  real bC;
-  vector<lower=0>[3] sigma_G;
-  real<lower=0> sigma;
-  vector<lower=0>[2] sigma_ACW;
-  real<lower=0> sigma_2;
-  cholesky_factor_corr[3] L_med; // Means Rho matrix is a 3x3 matrix
-  cholesky_factor_corr[2] L_dir; // Means Rho matrix is a 2x2 matrix
-  vector[3] z_med[100];
-  vector[2] z_dir[100];
-}
-
-transformed parameters{
-  vector[10] bACW_G;
-  vector[10] bMY_G;
-  vector[10] a_G;
-  for ( j in 1:10 ){
-    a_G[j] = a + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[1];
-    bMY_G[j] = bMY + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[2];
-    bACW_G[j] = bACW + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[3];
-  } 
-  
-  vector[10] bC_G;
-  vector[10] aC_G;
-  for ( j in 1:10 ){
-    aC_G[j] = aC + (diag_pre_multiply(sigma_ACW, L_dir) * z_dir[j])[1];
-    bC_G[j] = bC + (diag_pre_multiply(sigma_ACW, L_dir) * z_dir[j])[2];
-  } 
-}
-
-model{
-  vector[360] mu;
-  vector[360] mu_ACW;
-  
-  L_med ~ lkj_corr_cholesky( 2 );
-  L_dir ~lkj_corr_cholesky( 2 );
-  
-  sigma ~ exponential( 1 );
-  sigma_G ~ exponential( 1 );
-  sigma_ACW ~ exponential( 1 );
-  
-  bACW ~ normal( 0.5 , 0.25 );
-  bMY ~ normal( -0.5 , 0.25 );
-  
-  a ~ normal( 0 , 0.5 );
-  aC ~ normal( 0 , 0.5 );
-  bC ~ normal( 0 , 0.5 );
-  
-   
-  for (i in 1:10) {
-    z_med[i] ~ normal(0, 1); 
-    z_dir[i] ~ normal(0, 1);// This applies the normal distribution to each 2D vector
-  }
-  
-    // MY -> ACW
-    for ( i in 1:360 ) {
-     mu_ACW[i] = aC_G[G[i]] + bC_G[G[i]] * MY_std[i];
-    }
-    
-    ACW_std ~ normal( mu_ACW, sigma_2 );
-    
-    // MY -> GS <- ACW 
-    for ( i in 1:360 ) {
-      mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
-    }
-    GS_std ~ normal( mu , sigma );
-}
-
-generated quantities{
-  vector[360] mu;
-  matrix[3,3] Rho_med;
-  matrix[2,2] Rho_dir;
-  Rho_med = multiply_lower_tri_self_transpose(L_med);
-  Rho_dir = multiply_lower_tri_self_transpose(L_dir);
-  for ( i in 1:360 ) {
-    mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
-  }
-}
-
-"
-stan_model_object <- stanc(model_code = stan_syn)
-model <- stan_model(stanc_ret = stan_model_object)
-fit <- sampling(model, data = d, iter = 2000, chains = 4, cores= 4) #Synthetic
-
 # Stan model ####
 stan_syn <-"
 data{
-  vector[36000] GS_std;
-  vector[36000] MY_std;
-  vector[36000] ACW_std;
-  int G[36000];
+  int n_subj; // Total number of subjects
+  int n_regions; //Total number of regions per subject
+  vector[n_subj * n_regions] GS_std;
+  vector[n_subj * n_regions] MY_std;
+  vector[n_subj * n_regions] ACW_std;
+  int G[n_subj * n_regions];
 }
 parameters{
   real a;
@@ -749,31 +665,31 @@ parameters{
   real<lower=0> sigma_2;
   cholesky_factor_corr[3] L_med; // Means Rho matrix is a 3x3 matrix
   cholesky_factor_corr[2] L_dir; // Means Rho matrix is a 2x2 matrix
-  vector[3] z_med[100];
-  vector[2] z_dir[100];
+  vector[3] z_med[n_subj];
+  vector[2] z_dir[n_subj];
 }
 
 transformed parameters{
-  vector[100] bACW_G;
-  vector[100] bMY_G;
-  vector[100] a_G;
-  for ( j in 1:100 ){
+  vector[n_subj] bACW_G;
+  vector[n_subj] bMY_G;
+  vector[n_subj] a_G;
+  for ( j in 1:n_subj ){
     a_G[j] = a + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[1];
     bMY_G[j] = bMY + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[2];
     bACW_G[j] = bACW + (diag_pre_multiply(sigma_G, L_med) * z_med[j])[3];
   } 
   
-  vector[100] bC_G;
-  vector[100] aC_G;
-  for ( j in 1:100 ){
+  vector[n_subj] bC_G;
+  vector[n_subj] aC_G;
+  for ( j in 1:n_subj ){
     aC_G[j] = aC + (diag_pre_multiply(sigma_ACW, L_dir) * z_dir[j])[1];
     bC_G[j] = bC + (diag_pre_multiply(sigma_ACW, L_dir) * z_dir[j])[2];
   } 
 }
 
 model{
-  vector[36000] mu;
-  vector[36000] mu_ACW;
+  vector[n_subj * n_regions] mu;
+  vector[n_subj * n_regions] mu_ACW;
   
   L_med ~ lkj_corr_cholesky( 2 );
   L_dir ~lkj_corr_cholesky( 2 );
@@ -781,46 +697,44 @@ model{
   sigma ~ exponential( 1 );
   sigma_G ~ exponential( 1 );
   sigma_ACW ~ exponential( 1 );
+  sigma_2 ~ exponential( 1 );
   
   bACW ~ normal( 0.5 , 0.25 );
   bMY ~ normal( -0.5 , 0.25 );
   
   a ~ normal( 0 , 0.5 );
-  aC ~ normal( 0 , 0.5 );
-  bC ~ normal( 0 , 0.5 );
+  aC ~ normal( 0, 0.25 ); // Direct effect of MY on ACW 
+  bC ~ normal( -0.6 , 0.25 );
   
    
-  for (i in 1:100) {
+  for (i in 1:n_subj) {
     z_med[i] ~ normal(0, 1); 
     z_dir[i] ~ normal(0, 1);// This applies the normal distribution to each 2D vector
   }
   
     // MY -> ACW
-    for ( i in 1:36000 ) {
+    for ( i in 1:n_subj*n_regions ) {
      mu_ACW[i] = aC_G[G[i]] + bC_G[G[i]] * MY_std[i];
     }
     
     ACW_std ~ normal( mu_ACW, sigma_2 );
     
     // MY -> GS <- ACW 
-    for ( i in 1:36000 ) {
+    for ( i in 1:n_subj*n_regions ) {
       mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
     }
     GS_std ~ normal( mu , sigma );
 }
 
 generated quantities{
-  vector[36000] log_lik;
-  vector[36000] mu;
+  vector[n_subj*n_regions] mu;
   matrix[3,3] Rho_med;
   matrix[2,2] Rho_dir;
   Rho_med = multiply_lower_tri_self_transpose(L_med);
   Rho_dir = multiply_lower_tri_self_transpose(L_dir);
-  for ( i in 1:36000 ) {
+  for ( i in 1:n_subj*n_regions ) {
     mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
   }
-  for ( i in 1:36000 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );
-  array[36000] real y_rep = normal_rng(mu, sigma);
 }
 "
 stan_model_object <- stanc(model_code = stan_syn)
