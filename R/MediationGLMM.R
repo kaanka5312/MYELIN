@@ -635,18 +635,19 @@ GS_std <- rnorm(n_subj * n_regions, mu, sigma)
 
 d <- list(n_subj = n_subj, 
           n_regions = n_regions, 
+          self = G-1,
           G=subj_id, 
           MY_std = MY_std * (G-1), 
           ACW_std = ACW_std * (G-1) , 
           GS_std = GS_std)
 
 # Synthetic 
-# Stan model ####
 stan_syn <-"
 data{
   int n_subj; // Total number of subjects
   int n_regions; //Total number of regions per subject
-  vector[n_subj * n_regions] GS_std;
+  vector[n_subj * n_regions ] self; // defines 1 as self 0 as nonself
+  vector[n_subj * n_regions ] GS_std;
   vector[n_subj * n_regions] MY_std;
   vector[n_subj * n_regions] ACW_std;
   int G[n_subj * n_regions];
@@ -656,8 +657,6 @@ parameters{
   real aC;
   real bMY;
   real bACW;
-  real a_C;
-  real b_C;
   real bC;
   vector<lower=0>[3] sigma_G;
   real<lower=0> sigma;
@@ -692,7 +691,7 @@ model{
   vector[n_subj * n_regions] mu_ACW;
   
   L_med ~ lkj_corr_cholesky( 2 );
-  L_dir ~lkj_corr_cholesky( 2 );
+  L_dir ~ lkj_corr_cholesky( 2 );
   
   sigma ~ exponential( 1 );
   sigma_G ~ exponential( 1 );
@@ -703,8 +702,8 @@ model{
   bMY ~ normal( -0.5 , 0.25 );
   
   a ~ normal( 0 , 0.5 );
-  aC ~ normal( 0, 0.25 ); // Direct effect of MY on ACW 
-  bC ~ normal( -0.6 , 0.25 );
+  aC ~ normal( -0.3, 0.25 ); // Direct effect of MY on ACW 
+  bC ~ normal( -0.3 , 0.25 );
   
    
   for (i in 1:n_subj) {
@@ -714,14 +713,14 @@ model{
   
     // MY -> ACW
     for ( i in 1:n_subj*n_regions ) {
-     mu_ACW[i] = aC_G[G[i]] + bC_G[G[i]] * MY_std[i];
+     mu_ACW[i] = aC_G[G[i]] + bC_G[G[i]] * MY_std[i] * self[i];
     }
     
     ACW_std ~ normal( mu_ACW, sigma_2 );
     
     // MY -> GS <- ACW 
     for ( i in 1:n_subj*n_regions ) {
-      mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
+      mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] * self[i] + bACW_G[G[i]] * ACW_std[i] * self[i] ;
     }
     GS_std ~ normal( mu , sigma );
 }
@@ -736,6 +735,7 @@ generated quantities{
     mu[i] = a_G[G[i]] + bMY_G[G[i]] * MY_std[i] + bACW_G[G[i]] * ACW_std[i] ;
   }
 }
+
 "
 stan_model_object <- stanc(model_code = stan_syn)
 model <- stan_model(stanc_ret = stan_model_object)
