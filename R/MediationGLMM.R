@@ -575,6 +575,7 @@ d <- data.frame(G=cafe_id, MY_std = afternoon, ACW_std = weekend, GS_std = wait)
 a <- 0 # average GSCORR
 ac <- 0 # average ACW between ACW-MY
 b <- (-0.5) # average difference in myelin
+
 bc <- 0
 c <- (0.5) # average difference in ACW
 
