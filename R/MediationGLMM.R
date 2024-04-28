@@ -1078,29 +1078,32 @@ save(fit.mediated, file = "/media/kaansocat/Elements/EIB/DATA/MultMed.RData" )
       sigma
     );
   } "
-post <- extract.samples(fit)
+post <- extract.samples(fit.mediated)
 xseq <- seq(from = -2 , to = 2 , length = 100)
 colors <- rainbow(2) # Generate distinct colors for self and nonself
 
 ####### Counter-factual plot that showing relation between MY -> ACW, controlling MY #######               
 # Meaning across subjects for visual purposes
 n_subj = 100
+#=+=+=+=+=+=+=+=+ N O N - S E L F =+=+=+=+=+=+=+=+=+=+ #
 colMeanPlot <- matrix(NA, ncol = n_subj, nrow = length(xseq))
 
 plot(NULL,type = "l", ylim= c(-2.5,2.5),xlim=c(-2.5,2.5),
-     xlab = "Standardized Myelin", ylab = "Standardized ACW", main= "Counterfactual Plot")
+     xlab = "Standardized Myelin", ylab = "Standardized ACW", main= "ACW - MY for each subject")
 
 for (s in 1:n_subj) {
   ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, 
                                                         ac_subj_nonself[,s] + bc_subj_nonself[,s]*xseq[i], 
                                                         sigma_2 )
   ))
-  #  lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],0.4)) 
-  #  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[1],0.05))
+    lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[2],0.1)) 
+    shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[2],0.01))
   colMeanPlot[,s] = colMeans(ACW_sim)
   
 }
-lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[1],0.8))
+lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha("black",0.8))
+
+#=+=+=+=+=+=+=+=+ S E L F =+=+=+=+=+=+=+=+=+=+ #
 
 colMeanPlot <- matrix(NA, ncol = n_subj, nrow = length(xseq))
 for (s in 1:n_subj) {
@@ -1108,11 +1111,11 @@ for (s in 1:n_subj) {
                                                         ac_subj_self[,s] + bc_subj_self[,s]*xseq[i], 
                                                         sigma_2 )
   ))
-  #  lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[2],0.4)) 
-  #  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[2],0.05))
+    lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],0.1)) 
+    shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[1],0.01))
   colMeanPlot[,s] = colMeans(ACW_sim)
 }
-lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[2],0.8))
+lines(xseq, y = rowMeans(colMeanPlot), lwd=2, lty=2, col = col.alpha("black",0.8))
 
 
 ############### Total Effect of MY on GSCORR ###################
@@ -1137,10 +1140,10 @@ for (s in 1:n_subj) {
                                                          c_subj_nonself[,s] * ACW_sim[,i],
                                                        sigma)) )     
   colMeanPlot[,s] = colMeans(GS_sim)
-  #lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[1],0.4)) 
-  #shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[1],0.05))
+  lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[2],0.1)) 
+ # shade( apply(GS_sim, 2, PI), xseq,col = col.alpha("gray",0.003))
 }
-lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[1],0.8))
+lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha("black",0.8))
 
 #=+=+=+=+=+=+=+=+ S E L F =+=+=+=+=+=+=+=+=+=+ #
 
@@ -1158,10 +1161,10 @@ for (s in 1:n_subj) {
                                                          c_subj_self[,s] * ACW_sim[,i],
                                                        sigma)) )     
   colMeanPlot[,s] = colMeans(GS_sim)
-  #lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[2],0.4)) 
-  #shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[2],0.05))
+  lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[1],0.1)) 
+ # shade( apply(GS_sim, 2, PI), xseq,col = col.alpha("gray",0.003))
 }
-lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[2],0.8))
+lines(xseq, y = rowMeans(colMeanPlot), lwd=2,lty=2, col = col.alpha("black",0.8))
 
 ############################## Counter-factual Plot ########################
 
@@ -1177,10 +1180,10 @@ for (s in 1:n_subj) {
                                                         c_subj_nonself[,s] * xseq[i], 
                                                       sigma)) )    
   colMeanPlot[,s] = colMeans(GS_sim)
-  # lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[1],0.4)) 
-  #  shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[1],0.05))
+  lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[2],0.1)) 
+  #  shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[2],0.05))
 }
-lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[1],0.8))
+lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha("black",0.8))
 
 #=+=+=+=+=+=+=+=+ S E L F =+=+=+=+=+=+=+=+=+=+ #
 
@@ -1191,10 +1194,16 @@ for (s in 1:n_subj) {
                                                         c_subj_self[,s] * xseq[i], 
                                                       sigma)) )    
   colMeanPlot[,s] = colMeans(GS_sim)
-  #lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[2],0.4)) 
-  #shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[2],0.05))
+  lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[1],0.1)) 
+  #shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[1],0.05))
 }
-lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[2],0.8))
+lines(xseq, y = rowMeans(colMeanPlot), lwd=2,lty=2, col = col.alpha("black",0.8))
+# Adding legend 
+legend("topright",               # Position of the legend
+       legend = c("Self", "Non-self"), # Text in the legend
+       col = c("red", "blue"),   # Colors of the lines in the legend
+       lty = c(1, 2),            # Line types
+       cex = 1.5)                # Font size of the legend text                             
 
 ############## PRIOR PREDICTIVE CHECK ################
 a1 <- rnorm(1e3, 0, 0.5 )
