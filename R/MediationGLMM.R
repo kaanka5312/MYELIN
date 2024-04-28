@@ -1084,31 +1084,32 @@ colors <- rainbow(2) # Generate distinct colors for self and nonself
 
 ####### Counter-factual plot that showing relation between MY -> ACW, controlling MY #######               
 # Meaning across subjects for visual purposes
-colMeanPlot <- matrix(NA, ncol = s, nrow = length(xseq))
+n_subj = 100
+colMeanPlot <- matrix(NA, ncol = n_subj, nrow = length(xseq))
 
 plot(NULL,type = "l", ylim= c(-2.5,2.5),xlim=c(-2.5,2.5),
      xlab = "Standardized Myelin", ylab = "Standardized ACW", main= "Counterfactual Plot")
 
-for (s in 1:10) {
+for (s in 1:n_subj) {
   ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, 
                                                         ac_subj_nonself[,s] + bc_subj_nonself[,s]*xseq[i], 
                                                         sigma_2 )
   ))
-  lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],0.4)) 
-  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[1],0.05))
+  #  lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],0.4)) 
+  #  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[1],0.05))
   colMeanPlot[,s] = colMeans(ACW_sim)
   
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[1],0.8))
 
-colMeanPlot <- matrix(NA, ncol = s, nrow = length(xseq))
-for (s in 1:10) {
+colMeanPlot <- matrix(NA, ncol = n_subj, nrow = length(xseq))
+for (s in 1:n_subj) {
   ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, 
                                                         ac_subj_self[,s] + bc_subj_self[,s]*xseq[i], 
                                                         sigma_2 )
   ))
-  lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[2],0.4)) 
-  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[2],0.05))
+  #  lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[2],0.4)) 
+  #  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[2],0.05))
   colMeanPlot[,s] = colMeans(ACW_sim)
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[2],0.8))
@@ -1118,12 +1119,12 @@ lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[2],0.8))
 
 #=+=+=+=+=+=+=+=+ N O N - S E L F =+=+=+=+=+=+=+=+=+=+ #
 
-colMeanPlot <- matrix(NA, ncol = s, nrow = length(xseq))
+colMeanPlot <- matrix(NA, ncol = n_subj, nrow = length(xseq))
 
 plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
      xlab = "Standardized Myelin", ylab = "Standardized GSCORR", main = "Total Effect of MY on GSCORR",sub= "Counterfactual Plot")
 
-for (s in 1:10) {
+for (s in 1:n_subj) {
   ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, 
                                                         ac_subj_nonself[,s] + bc_subj_nonself[,s]*xseq[i],  
                                                         sigma_2 )
@@ -1136,15 +1137,15 @@ for (s in 1:10) {
                                                          c_subj_nonself[,s] * ACW_sim[,i],
                                                        sigma)) )     
   colMeanPlot[,s] = colMeans(GS_sim)
-  lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[1],0.4)) 
-  shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[1],0.05))
+  #lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[1],0.4)) 
+  #shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[1],0.05))
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[1],0.8))
 
 #=+=+=+=+=+=+=+=+ S E L F =+=+=+=+=+=+=+=+=+=+ #
 
-colMeanPlot <- matrix(NA, ncol = s, nrow = length(xseq))
-for (s in 1:10) {
+colMeanPlot <- matrix(NA, ncol = n_subj, nrow = length(xseq))
+for (s in 1:n_subj) {
   ACW_sim <- with(post, sapply(1:100, function(i) rnorm(1e3, 
                                                         ac_subj_self[,s] + bc_subj_self[,s]*xseq[i],  
                                                         sigma_2 )
@@ -1157,8 +1158,8 @@ for (s in 1:10) {
                                                          c_subj_self[,s] * ACW_sim[,i],
                                                        sigma)) )     
   colMeanPlot[,s] = colMeans(GS_sim)
-  lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[2],0.4)) 
-  shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[2],0.05))
+  #lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[2],0.4)) 
+  #shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[2],0.05))
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[2],0.8))
 
@@ -1166,32 +1167,32 @@ lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[2],0.8))
 
 #=+=+=+=+=+=+=+=+ N O N - S E L F =+=+=+=+=+=+=+=+=+=+ #
 
-colMeanPlot <- matrix(NA, ncol = s, nrow = length(xseq))
+colMeanPlot <- matrix(NA, ncol = n_subj, nrow = length(xseq))
 
 plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
      xlab = "Standardized ACW", ylab = "Standardized GSCORR", main = "Counterfacted relationship")
-for (s in 1:10) {
+for (s in 1:n_subj) {
   GS_sim <- with(post,sapply(1:100, function(i) rnorm(1e3, a_subj_nonself[,s] + 
                                                         b_subj_nonself[,s] * 0 + 
                                                         c_subj_nonself[,s] * xseq[i], 
                                                       sigma)) )    
   colMeanPlot[,s] = colMeans(GS_sim)
-  lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[1],0.4)) 
-  shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[1],0.05))
+  # lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[1],0.4)) 
+  #  shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[1],0.05))
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[1],0.8))
 
 #=+=+=+=+=+=+=+=+ S E L F =+=+=+=+=+=+=+=+=+=+ #
 
-colMeanPlot <- matrix(NA, ncol = s, nrow = length(xseq))
-for (s in 1:10) {
+colMeanPlot <- matrix(NA, ncol = n_subj, nrow = length(xseq))
+for (s in 1:n_subj) {
   GS_sim <- with(post,sapply(1:100, function(i) rnorm(1e3, a_subj_self[,s] + 
                                                         b_subj_self[,s] * 0 + 
                                                         c_subj_self[,s] * xseq[i], 
                                                       sigma)) )    
   colMeanPlot[,s] = colMeans(GS_sim)
-  lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[2],0.4)) 
-  shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[2],0.05))
+  #lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[2],0.4)) 
+  #shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[2],0.05))
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha(colors[2],0.8))
 
