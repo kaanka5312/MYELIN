@@ -1059,6 +1059,8 @@ model <- stan_model(stanc_ret = stan_model_object)
 fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4, cores= 6) # Real
 save(fit.mediated, file = "/media/kaansocat/Elements/EIB/DATA/MultMed.RData" )
 
+# If prior predictive want to add during the stan this can be added 
+# However, increase time during code and final size significantly.
 " 
   vector[n_subj * n_regions] GS_std_prior;
   vector[n_subj * n_regions] ACW_std_prior;
@@ -1078,6 +1080,122 @@ save(fit.mediated, file = "/media/kaansocat/Elements/EIB/DATA/MultMed.RData" )
       sigma
     );
   } "
+
+############## PRIOR PREDICTIVE CHECK ################
+# Compute the model for ACW_std_prior based on the parameters and data
+# Simulate ACW_std_prior from the normal distribution with mu_ACW and sigma_2
+
+a1 <- rnorm(1e3, 0, 0.5 )
+b1 <- rnorm(1e3, 0, 0.5 )
+c1 <- rnorm(1e3, 0, 0.5 )
+
+a2 <- rnorm(1e3, 0, 0.5 )
+b2 <- rnorm(1e3, 0, 0.5 )
+c2 <- rnorm(1e3, 0, 0.5)
+
+ac1 <- rnorm(1e3, 0, 0.5)
+bc1 <- rnorm(1e3, 0, 0.5)
+ac2 <- rnorm(1e3, 0, 0.5)
+bc2 <- rnorm(1e3, 0, 0.5)
+
+self <- rbinom(1000, 1, 1)  # Binary, assuming about half are 'self'
+nonself <- 1 - self  # Directly opposite of self
+MY_std <- rnorm(1000)  # Standard normal distribution for MY_std
+sigma_2 <- 0.5  # Assuming a constant standard deviation for simplicity
+sigma <- 0.5
+
+xseq <- c(-2,2)
+# Compute the model for ACW_std_prior based on the parameters and data
+# Simulate ACW_std_prior from the normal distribution with mu_ACW and sigma_2
+ACW_sim <- sapply(1:2, function(i) rnorm(1e3,ac1 * self + bc1 * xseq[i] * self +
+                                           ac2 * nonself + bc2 * xseq[i] * nonself, sigma_2 ) )
+
+plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
+     xlab = "Standardized ACW", ylab = "Standardized GSCORR", main = "Counterfacted relationship")
+#lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],1), lwd=2) 
+for (i in 1:200) lines(xseq, ACW_sim[i,],col=col.alpha("black",0.4), lwd=2 )
+
+# Calculate mu_GS based on the model specified
+
+GS_sim <- sapply(1:2, function(i) rnorm(1e3,mean = a1 * self + b1 * xseq[i] * self + c1 * ACW_sim[,i] * self +
+                                          a2 * nonself + b2 * xseq[i] * nonself + c2 * ACW_sim[,i] * nonself,
+                                        sigma) )      
+
+plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
+     xlab = "Standardized ACW", ylab = "Standardized GSCORR", main = "Counterfacted relationship")
+#lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],1), lwd=2) 
+for (i in 1:200) lines(xseq, GS_sim[i,],col=col.alpha("black",0.4), lwd=2 )
+
+########## Output Space of multivariate distrubition ##############
+library(MASS)
+ac1_prior = matrix(NA,ncol = 100, nrow=4e3)
+bc1_prior = matrix(NA,ncol = 100, nrow=4e3)
+ac2_prior = matrix(NA,ncol = 100, nrow=4e3)
+bc2_prior = matrix(NA,ncol = 100, nrow=4e3)
+
+for (i in 1:4e3) {
+  mean_prior <- c (0, 0, 0, 0)
+  sigma_prior <- c(0.5, 0.5, 0.5, 0.5)
+  Sigma <- diag(sigma_prior) %*% rlkjcorr(1,4,eta=2) %*% diag(sigma_prior)
+  vary_effect <- mvrnorm(100, mean_prior, Sigma)
+  ac1_prior[i,] = vary_effect[,1]
+  bc1_prior[i,] = vary_effect[,2]
+  ac2_prior[i,] = vary_effect[,3]
+  bc2_prior[i,] = vary_effect[,4]
+}
+
+a1_prior = matrix(NA,ncol = 100, nrow=4e3)
+b1_prior = matrix(NA,ncol = 100, nrow=4e3)
+c1_prior = matrix(NA,ncol = 100, nrow=4e3)
+a2_prior = matrix(NA,ncol = 100, nrow=4e3)
+b2_prior = matrix(NA,ncol = 100, nrow=4e3)
+c2_prior = matrix(NA,ncol = 100, nrow=4e3)
+
+for (i in 1:4e3) {
+  mean_prior <- c (0, 0, 0, 0, 0, 0)
+  sigma_prior <- c(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
+  Sigma <- diag(sigma_prior) %*% rlkjcorr(1,6,eta=2) %*% diag(sigma_prior)
+  vary_effect <- mvrnorm(100, mean_prior, Sigma)
+  a1_prior[i,] = vary_effect[,1]
+  b1_prior[i,] = vary_effect[,2]
+  c1_prior[i,] = vary_effect[,3]
+  a2_prior[i,] = vary_effect[,4]
+  b2_prior[i,] = vary_effect[,5]
+  c2_prior[i,] = vary_effect[,6]
+}
+
+
+
+a_self <- apply( a1_prior , 2 , mean ) 
+b_self <- apply( b1_prior , 2 , mean )
+c_self <- apply( c1_prior , 2 , mean )
+a_nonself <- apply( a2_prior , 2 , mean ) 
+b_nonself <- apply( b2_prior , 2 , mean )
+c_nonself <- apply( c2_prior , 2 , mean )
+
+ac_self <- apply( ac1_prior , 2 , mean ) 
+bc_self <- apply( bc1_prior , 2 , mean ) 
+ac_nonself <- apply( ac2_prior , 2 , mean ) 
+bc_nonself <- apply( bc2_prior , 2 , mean ) 
+
+ACW_ns <- ac_nonself + bc_nonself
+ACW_s <- ac_self + bc_self
+
+GS_ns <- a_nonself + b_nonself * ACW_ns + c_nonself
+GS_s <- a_self + b_self * ACW_s + c_self
+
+plot( GS_ns, GS_s, xlab = "standardized GS nonself", ylab = "standardized GS Self",
+      main = "Prior Subject Distribution",
+      pch = 16, col = rangi2, 
+      ylim = c( min(GS_s)-0.1 , max(GS_s)+0.1 ),
+      xlim=c( min(GS_ns)-0.1 , max(GS_ns)+0.1 ) )
+abline( a=0 , b=1 , lty=2, lwd=2 )
+
+
+################################################################################
+#+=+=+=+=+=+=+=+=+=+=+=+=  P L O T T I N G +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+#+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
 post <- extract.samples(fit.mediated)
 xseq <- seq(from = -2 , to = 2 , length = 100)
 colors <- rainbow(2) # Generate distinct colors for self and nonself
@@ -1096,8 +1214,8 @@ for (s in 1:n_subj) {
                                                         ac_subj_nonself[,s] + bc_subj_nonself[,s]*xseq[i], 
                                                         sigma_2 )
   ))
-    lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[2],0.1)) 
-    shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[2],0.01))
+  lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[2],0.1)) 
+  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[2],0.01))
   colMeanPlot[,s] = colMeans(ACW_sim)
   
 }
@@ -1111,8 +1229,8 @@ for (s in 1:n_subj) {
                                                         ac_subj_self[,s] + bc_subj_self[,s]*xseq[i], 
                                                         sigma_2 )
   ))
-    lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],0.1)) 
-    shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[1],0.01))
+  lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],0.1)) 
+  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[1],0.01))
   colMeanPlot[,s] = colMeans(ACW_sim)
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2, lty=2, col = col.alpha("black",0.8))
@@ -1141,7 +1259,7 @@ for (s in 1:n_subj) {
                                                        sigma)) )     
   colMeanPlot[,s] = colMeans(GS_sim)
   lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[2],0.1)) 
- # shade( apply(GS_sim, 2, PI), xseq,col = col.alpha("gray",0.003))
+  # shade( apply(GS_sim, 2, PI), xseq,col = col.alpha("gray",0.003))
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha("black",0.8))
 
@@ -1162,7 +1280,7 @@ for (s in 1:n_subj) {
                                                        sigma)) )     
   colMeanPlot[,s] = colMeans(GS_sim)
   lines(xseq, y = colMeans(GS_sim), col=col.alpha(colors[1],0.1)) 
- # shade( apply(GS_sim, 2, PI), xseq,col = col.alpha("gray",0.003))
+  # shade( apply(GS_sim, 2, PI), xseq,col = col.alpha("gray",0.003))
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2,lty=2, col = col.alpha("black",0.8))
 
@@ -1205,107 +1323,102 @@ legend("topright",               # Position of the legend
        lty = c(2, 1),            # Line types
        cex = 1.5)                # Font size of the legend text                             
 
-############## PRIOR PREDICTIVE CHECK ################
-a1 <- rnorm(1e3, 0, 0.5 )
-b1 <- rnorm(1e3, 0, 0.5 )
-c1 <- rnorm(1e3, 0, 0.5 )
+########## P R I O R / P O S T    C O R R E L A T I O N ##################
 
-a2 <- rnorm(1e3, 0, 0.5 )
-b2 <- rnorm(1e3, 0, 0.5 )
-c2 <- rnorm(1e3, 0, 0.5)
+set.seed(123)
+post <- extract.samples( fit.mediated )
 
-ac1 <- rnorm(1e3, 0, 0.5)
-bc1 <- rnorm(1e3, 0, 0.5)
-ac2 <- rnorm(1e3, 0, 0.5)
-bc2 <- rnorm(1e3, 0, 0.5)
+# Alpha and Myelin Slope Correlation
 
-self <- rbinom(1000, 1, 1)  # Binary, assuming about half are 'self'
-nonself <- 1 - self  # Directly opposite of self
-MY_std <- rnorm(1000)  # Standard normal distribution for MY_std
-sigma_2 <- 0.5  # Assuming a constant standard deviation for simplicity
-sigma <- 0.5
+dens( post$Rho_med[,4,5] , xlim=c(-1,1), 
+      show.HPDI = TRUE, show.zero = TRUE,
+      lwd =2, col="blue", main = "Correlation between intercept \nand myelin slopes"  ) # posterior of self 
+dens( post$Rho_med[,1,2] , xlim=c(-1,1), 
+      show.HPDI = TRUE, show.zero = TRUE, add = TRUE,
+      lwd =2, col="red"  ) # posterior of self 
+R <- rlkjcorr( 1e4 , K=2 , eta=2 ) # prior
+dens( R[,1,2], lty=2, lwd =2 , add=TRUE )
+legend("topleft",               # Position of the legend
+       legend = c("Self", "Non-self", "prior"), # Text in the legend
+       col = c("red", "blue", "black"),   # Colors of the lines in the legend
+       lty = c(1, 1, 2),            # Line types
+       cex = 1)                # Font size of the legend text      
 
-xseq <- c(-2,2)
-# Compute the model for ACW_std_prior based on the parameters and data
-# Simulate ACW_std_prior from the normal distribution with mu_ACW and sigma_2
-ACW_sim <- sapply(1:2, function(i) rnorm(1e3,ac1 * self + bc1 * xseq[i] * self +
-                                           ac2 * nonself + bc2 * xseq[i] * nonself, sigma_2 ) )
-plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
-     xlab = "Standardized ACW", ylab = "Standardized GSCORR", main = "Counterfacted relationship")
-#lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],1), lwd=2) 
-for (i in 1:200) lines(xseq, ACW_sim[i,],col=col.alpha("black",0.4), lwd=2 )
-
-# Calculate mu_GS based on the model specified
-
-GS_sim <- sapply(1:2, function(i) rnorm(1e3,mean = a1 * self + b1 * xseq[i] * self + c1 * ACW_sim[,i] * self +
-                                          a2 * nonself + b2 * xseq[i] * nonself + c2 * ACW_sim[,i] * nonself,
-                                        sigma) )      
-
-plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
-     xlab = "Standardized ACW", ylab = "Standardized GSCORR", main = "Counterfacted relationship")
-#lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],1), lwd=2) 
-for (i in 1:200) lines(xseq, GS_sim[i,],col=col.alpha("black",0.4), lwd=2 )
-
-# Define the number of simulations and subjects
-n <- 1000
-n_subj <- 10  # Assuming 10 subjects for simplicity
-
-# Generate parameters using normal distributions based on priors
-a_subj_self <- rnorm(n_subj, 0, 0.5)
-b_subj_self <- rnorm(n_subj, -0.5, 0.25)
-c_subj_self <- rnorm(n_subj, 0, 0.25)
-
-# Define the standard deviation for the outcomes
-sigma <- 0.25
-
-# Create a sequence over which to evaluate the model
-xseq <- seq(-1, 1, length.out = 100)
-# Pre-allocate a matrix to store simulation results
-GS_sim <- matrix(nrow = n, ncol = length(xseq))
-
-# Simulate outcomes for each value in xseq
-for (i in seq_along(xseq)) {
-  GS_sim[, i] <- rnorm(n, 
-                       mean = a_subj_self + c_subj_self * xseq[i],
-                       sd = sigma)
+# Beta values dist. 
+plot(NULL, type = "l", ylim= c(0,5),xlim=c(-2.5,2.5))
+for (i in 1:100) {
+  dens(post$c_subj_nonself[,i], add = TRUE)
+  
 }
 
-plot(NULL,type = "l", ylim= c(-2,2),xlim=c(-2,2),
-     xlab = "Standardized ACW", ylab = "Standardized GSCORR", main = "Counterfacted relationship")
-lines(xseq, y = colMeans(GS_sim),col=col.alpha(colors[2],1)) 
-shade( apply(GS_sim, 2, PI), xseq,col = col.alpha(colors[2],0.2))
-###### Plotting #######
+########### Output space subject distribution ############
+#
+# MY -> GS <- ACW
+with(post,{
+  a_self <- apply( a_subj_self , 2 , mean ) 
+  b_self <- apply( b_subj_self , 2 , mean )
+  c_self <- apply( c_subj_self , 2 , mean )
+  a_nonself <- apply( a_subj_nonself , 2 , mean ) 
+  b_nonself <- apply( b_subj_nonself , 2 , mean )
+  c_nonself <- apply( c_subj_nonself , 2 , mean )
+  
+  GS_ns <- a_nonself + b_nonself + c_nonself
+  GS_s <- a_self + b_self + c_self
+  
+  plot( GS_ns, GS_s, xlab = "standardized GS nonself", ylab = "standardized GS Self",
+        main = "MY -> GS <- ACW", 
+        pch = 16, col = rangi2, 
+        ylim = c( min(GS_s)-0.1 , max(GS_s)+0.1 ),
+        xlim=c( min(GS_ns)-0.1 , max(GS_ns)+0.1 ) )
+  abline( a=0 , b=1 , lty=2, lwd=2 )
+}
+)
 
-# Posterior prediction plot
-library(rethinking)
-# Prior and posterior correlation
-post <- extract.samples( m1 )
+# Mediation model
+with(post,{
+     a_self <- apply( a_subj_self , 2 , mean ) 
+     b_self <- apply( b_subj_self , 2 , mean )
+     c_self <- apply( c_subj_self , 2 , mean )
+     a_nonself <- apply( a_subj_nonself , 2 , mean ) 
+     b_nonself <- apply( b_subj_nonself , 2 , mean )
+     c_nonself <- apply( c_subj_nonself , 2 , mean )
+     
+     ac_self <- apply( ac_subj_self , 2 , mean ) 
+     bc_self <- apply( bc_subj_self , 2 , mean ) 
+     ac_nonself <- apply( ac_subj_nonself , 2 , mean ) 
+     bc_nonself <- apply( bc_subj_nonself , 2 , mean ) 
+     
+     ACW_ns <- ac_nonself + bc_nonself
+     ACW_s <- ac_self + bc_self
+       
+     GS_ns <- a_nonself + b_nonself * ACW_ns + c_nonself
+     GS_s <- a_self + b_self * ACW_s + c_self
+     
+     plot( GS_ns, GS_s, xlab = "standardized GS nonself", ylab = "standardized GS Self",
+           main = "Mediation model",
+           pch = 16, col = rangi2, 
+           ylim = c( min(GS_s)-0.1 , max(GS_s)+0.1 ),
+           xlim=c( min(GS_ns)-0.1 , max(GS_ns)+0.1 ) )
+     abline( a=0 , b=1 , lty=2, lwd=2 )
+}
+)
 
-dens( post$Rho_med[,1,2] , xlim=c(-1,1) ) # posterior
-R <- rlkjcorr( 1e4 , K=2 , eta=2 ) # prior
-dens( R[,1,2] , add=TRUE , lty=2 )
 
-dens( post$bMY_G[,1] , xlim=c(-1,1) ) # posterior
-prior<- mvrnorm( 1e4 , Mu , Sigma ) 
-dens( prior[,1] , add=TRUE , lty=2 )
-prior <- extract.samples( m1, n=1000 )
+a2 <- apply( post$a_subj_self , 2 , mean ) 
+b2 <- apply( post$bMY_G , 2 , mean )
 
-N <- 1000 # total number of observations
-N_g <- 2 # number of groups
-group_id <- sample(1:N_g, N, replace = TRUE) # Randomly assign observations to 2 groups for demonstration
-xseq <- seq(-2,2, length.out=30) 
+Mu_est <- c( mean(post$a) , mean(post$bMY) ) 
+rho_est <- mean( post$Rho[,1,2] ) 
+sa_est <- mean( post$sigma_G[,1] ) 
+sb_est <- mean( post$sigma_G[,2] ) 
+cov_ab <- sa_est*sb_est*rho_est 
+Sigma_est <- matrix( c(sa_est^2,cov_ab,cov_ab,sb_est^2) , ncol=2 )
 
-y_simulated <- matrix(nrow = N, ncol = length(xseq)+1) # First column is for group
+plot(a2,b2, xlab = "intercept", ylab = "slope", pch = 16, 
+     col=rangi2 , ylim=c( min(b2)-0.1 , max(b2)+0.1 ) , xlim=c( min(a2)-0.1 , max(a2)+0.1) )
+library(ellipse)
+for ( l in c(0.1,0.3,0.5,0.8,0.99) ) lines(ellipse(Sigma_est,centre=Mu_est,level=l), col=col.alpha("black",0.2),lwd=2)
 
-y_sim1 <- with(prior,
-            sapply(1:30, 
-            function(i) rnorm(1e3, a_G[1] + bMY_G[1] * xseq[i], sigma)))
-
-y_sim2 <- with(prior,
-               sapply(1:30, 
-               function(i) rnorm(1e3, a_G[2] + bMY_G[2] * xseq[i], sigma)))
-
-sim_list = list(y_sim1,y_sim2)
 
 # Wrong plotting bu just here for if structure needed
 # for (i in 1:N) {
