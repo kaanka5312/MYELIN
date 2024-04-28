@@ -1057,6 +1057,7 @@ stan_model_object <- stanc(model_code = stan_syn)
 model <- stan_model(stanc_ret = stan_model_object)
 #fit <- sampling(model, data = d, iter = 2000, chains = 4, cores= 4) #Synthetic
 fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4, cores= 6) # Real
+save(fit.mediated, file = "/media/kaansocat/Elements/EIB/DATA/MultMed.RData" )
 
 " 
   vector[n_subj * n_regions] GS_std_prior;
