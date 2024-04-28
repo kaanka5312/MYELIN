@@ -1202,7 +1202,7 @@ lines(xseq, y = rowMeans(colMeanPlot), lwd=2,lty=2, col = col.alpha("black",0.8)
 legend("topright",               # Position of the legend
        legend = c("Self", "Non-self"), # Text in the legend
        col = c("red", "blue"),   # Colors of the lines in the legend
-       lty = c(1, 2),            # Line types
+       lty = c(2, 1),            # Line types
        cex = 1.5)                # Font size of the legend text                             
 
 ############## PRIOR PREDICTIVE CHECK ################
