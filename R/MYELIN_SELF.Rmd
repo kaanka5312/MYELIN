@@ -85,8 +85,12 @@ RegWise$G_1<-factor(RegWise$G_1, levels = c("Self", "Non-Self"))
 
 # 
 test <- readMat("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/MED.mat")
-test2 <- readMat("./DATA/")
+test2 <- readMat("./DATA/HighLowBandpassedINT.mat")
 
+RegWise <- data.frame(MY = test$MED[,3],
+                      ACW = rowMeans(test2$ACW0.arr), 
+                      GS = rowMeans(test2$GSCORR.arr),
+                      G_1 = ifelse(test$MED[,5]=="2","Self","Non-Self") )
 
 # ACW
 result <- RegWise %>%
