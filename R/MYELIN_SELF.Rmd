@@ -85,10 +85,10 @@ RegWise$G_1<-factor(RegWise$G_1, levels = c("Self", "Non-Self"))
 
 # 
 test <- readMat("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/MED.mat")
-test2 <- readMat("./DATA/HighLowBandpassedINT.mat")
+test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth.mat")
 
 RegWise <- data.frame(MY = test$MED[,3],
-                      ACW = rowMeans(test2$ACW0.arr), 
+                      ACW = rowMeans(test2$ACW0.halfwidth), 
                       GS = rowMeans(test2$GSCORR.arr),
                       G_1 = ifelse(test$MED[,5]=="2","Self","Non-Self") )
 
@@ -173,19 +173,16 @@ RegWise_DESC <- annotate_figure(RegWise_DESC, top = text_grob("Subjects are aver
 
 
 ##### SUBJ_WISE ###############
-subjdat<-readMat("E:/EIB/MATLAB_ClassificationApp/SUBJ_WISE.mat")
+subjdat<-readMat("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/SUBJ_WISE.mat")
 
 SUBJ_GLOB<-data.frame(subjdat$SUBJ.WISE.GLOBAL)
 colnames(SUBJ_GLOB)<-c("ACW","GS","MY")
-cor_test(SUBJ_GLOB,method="spearman")
 
 SUBJ_SELF<-data.frame(subjdat$SUBJ.WISE.SELF)
 colnames(SUBJ_SELF)<-c("ACW","GS","MY")
-cor_test(SUBJ_SELF,method="spearman")
 
 SUBJ_NONSELF<-data.frame(subjdat$SUBJ.WISE.NONSELF)
 colnames(SUBJ_NONSELF)<-c("ACW","GS","MY")
-cor_test(SUBJ_NONSELF,method="spearman")
 
 data_ACW<- data.frame(
   SELF = SUBJ_SELF$ACW,
@@ -200,6 +197,19 @@ data_GS<- data.frame(
 data_MY<- data.frame(
   SELF = SUBJ_SELF$MY,
   NONSELF = SUBJ_NONSELF$MY
+)
+
+##
+self <- as.logical(test$MED[,5]-1)
+
+data_ACW <- data.frame(
+  SELF = colMeans(test2$ACW0.halfwidth[self,]) ,
+  NONSELF = colMeans(test2$ACW0.halfwidth[!self,])
+)
+
+data_GS <- data.frame(
+  SELF = colMeans(test2$GSCORR.arr[self,]) ,
+  NONSELF = colMeans(test2$GSCORR.arr[!self,] )
 )
 
 ### ACW ###
