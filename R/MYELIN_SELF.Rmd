@@ -83,6 +83,11 @@ RegWise$G_2<-factor(RegWise$G_2)
 RegWise$G_1<-ifelse(RegWise$G_1=="2","Self","Non-Self")
 RegWise$G_1<-factor(RegWise$G_1, levels = c("Self", "Non-Self"))
 
+# 
+test <- readMat("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/MED.mat")
+test2 <- readMat("./DATA/")
+
+
 # ACW
 result <- RegWise %>%
   wilcox_test(ACW ~ G_1) %>%
