@@ -38,16 +38,21 @@
 
 # Define subject ID
 # subj=899885
-subj_list=/media/kaansocat/Elements/100_unrelated_subjects_list.txt
+
+#subj_list=/media/kaansocat/Elements/100_unrelated_subjects_list.txt
+subj_list=/mnt/e/EIB/100_unrelated_subjects_list.txt
 
 # Count the number of subjects
 # count=$(cat $subj_list | wc -l)
 count=100
 # HCP directory housing all subjects
 hcp_dir=/media/kaansocat/Elements/EIB/
+hcp_dir=/mnt/e/EIB/
+
 
 # Define pertinent directories
 subj_dir=/media/kaansocat/Elements/EIB # HCP directory housing all subjects
+subj_dir=/mnt/e/EIB/100_Subj
 
 # Define the atlas directory(ies)
 # Glasser atlas to be used

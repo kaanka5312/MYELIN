@@ -84,14 +84,14 @@ RegWise$G_1<-ifelse(RegWise$G_1=="2","Self","Non-Self")
 RegWise$G_1<-factor(RegWise$G_1, levels = c("Self", "Non-Self"))
 
 # 
-test <- readMat("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/MED.mat")
+test <- readMat("./DATA/MED.mat")
 test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth.mat")
 
 RegWise <- data.frame(MY = test$MED[,3],
                       ACW = rowMeans(test2$ACW0.halfwidth), 
                       GS = rowMeans(test2$GSCORR.arr),
                       G_1 = ifelse(test$MED[,5]=="2","Self","Non-Self") )
-
+writeMat("./DATA/RegWise.mat", Regwise = RegWise)
 # ACW
 result <- RegWise %>%
   wilcox_test(ACW ~ G_1) %>%
@@ -173,7 +173,7 @@ RegWise_DESC <- annotate_figure(RegWise_DESC, top = text_grob("Subjects are aver
 
 
 ##### SUBJ_WISE ###############
-subjdat<-readMat("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/SUBJ_WISE.mat")
+subjdat<-readMat("./DATA/SUBJ_WISE.mat")
 
 SUBJ_GLOB<-data.frame(subjdat$SUBJ.WISE.GLOBAL)
 colnames(SUBJ_GLOB)<-c("ACW","GS","MY")

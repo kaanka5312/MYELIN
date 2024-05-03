@@ -2,10 +2,11 @@
 % Author: kaanka5312
 
 % Adding toolboxes and data paths
-addpath("G:/Drive'ım/Research/Myelin_Self/")
+addpath("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/")
 addpath("C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/Matlab/")
 % loading the data 
 load( "E:/EIB/MATLAB_ClassificationApp/MED_TABLE.mat" )
+addpath("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/RegWise.mat")
 
 dataTable = movevars(dataTable, 'GSCORR','After','ACW') ;
 
@@ -13,25 +14,39 @@ dataTable.Class1(dataTable.Class1==1)=0;
 dataTable.Class1(dataTable.Class1==2)=1;
 
 CORD = load('C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/sphere_HCP.txt') ;
+
+% Bandpassed data 
+%{
+dataTable = table(Regwise.MY, Regwise.ACW, Regwise.GS, Regwise.G_1,...
+    'VariableNames',{'Myelin', 'ACW', 'GSCORR', 'Class1'} ) ;
+
+statusData = dataTable.Class1 ;
+
+statusData(strcmp(statusData, 'Non-Self')) = {0};
+statusData(strcmp(statusData, 'Self')) = {1};
+
+dataTable.Class1 = cell2mat(statusData) ;
+%}
+
 %% GLOBAL
 perm_id_g = rotate_parcellation(CORD(1:180,:), CORD(181:360,:), 10000 ) ;
 
 % Generates p value from above 
 %[GS_MY_p, GS_MY_d] = perm_sphere_p(MED(:,1), MED(:,3), perm_id_g, 'spearman') ; %GSCORR and MY
 %[ACW_MY_p, ACW_MY_d] = perm_sphere_p(MED(:,2), MED(:,3), perm_id_g, 'spearman') ; %GSCORR and ACW
-
+clear rvals
 [GS_MY_p, GS_MY_d] = perm_sphere_p(dataTable.GSCORR, dataTable.Myelin, perm_id_g, 'spearman') ; %GSCORR and MY
 [ACW_MY_p, ACW_MY_d] = perm_sphere_p(dataTable.ACW, dataTable.Myelin, perm_id_g, 'spearman') ; %ACW and MY
-[ACW_GS_p, ACW_GS_d] = perm_sphere_p(dataTable.ACW, dataTable.GSCORR, perm_id_g, 'spearman') ; %ACW and MY
+%[ACW_GS_p, ACW_GS_d] = perm_sphere_p(dataTable.ACW, dataTable.GSCORR, perm_id_g, 'spearman') ; %ACW and MY
 
 % R values 
 [rvals.GSCORR_MY ,~] = corr(dataTable.GSCORR,dataTable.Myelin,'type','Spearman') ;
 [rvals.ACW_MY ,~] = corr(dataTable.ACW,dataTable.Myelin,'type','Spearman') ;
-[rvals.ACW_GSCORR ,~] = corr(dataTable.ACW,dataTable.GSCORR,'type','Spearman') ;
+%[rvals.ACW_GSCORR ,~] = corr(dataTable.ACW,dataTable.GSCORR,'type','Spearman') ;
 
 
-p_and_d =  cell2struct({[ACW_MY_p; ACW_MY_d], [GS_MY_p; GS_MY_d], [ACW_GS_p; ACW_GS_d]}, ...
-                       { 'ACW_MY', 'GSCORR_MY', 'ACW_GSCORR' ...
+p_and_d =  cell2struct({[ACW_MY_p; ACW_MY_d], [GS_MY_p; GS_MY_d] }, ...
+                       { 'ACW_MY', 'GSCORR_MY', ...
                         }, 2);
 
 
@@ -40,7 +55,7 @@ f = figure,
     set(gcf,'units','normalized','position',[0 0 0.3 0.3])
     fns = fieldnames(p_and_d);
 
-    for k = 1:(numel(fieldnames(rvals))-1)
+    for k = 1:(numel(fieldnames(rvals)))
         % Define plot colors
         if k <= 3; col = [0.66 0.13 0.11]; else; col = [0.2 0.33 0.49]; end
 
@@ -74,7 +89,8 @@ hold on;
 % Plot the regression line
 xValues = linspace(min(dataTable.Myelin), max(dataTable.Myelin), 100);
 yFit = predict(lm, xValues');
-plot(xValues, yFit, 'r-', 'LineWidth', 2, 'DisplayName', 'r= -0.68, p_{spin} < 0.05');
+plot(xValues, yFit, 'r-', 'LineWidth', 2, 'DisplayName', ...
+    strcat('r=',num2str(rvals.ACW_MY), ' p_{spin} =', num2str(p_and_d.ACW_MY(1))) );
 
 % Plot confidence intervals
 [yPred, delta] = predict(lm, xValues', 'Prediction', 'curve', 'Confidence', 'on');
@@ -85,7 +101,7 @@ plot(xValues, yPred - delta, 'b--', 'HandleVisibility', 'off');
 % Customize the plot
 xlabel('ACW-0 (seconds)','FontSize',10);
 ylabel('Intracortical Myelin Content','FontSize',10);
-title('Spearman Correlation (p_{spin} < 0.05, r= -0.68)', 'FontSize', 14);
+%title('Spearman Correlation (p_{spin} < 0.05, r= -0.68)', 'FontSize', 14);
 legend('show', 'FontSize', 10);
 grid on;
 hold off;
@@ -103,7 +119,8 @@ hold on;
 % Plot the regression line
 xValues = linspace(min(dataTable.Myelin), max(dataTable.Myelin), 100);
 yFit = predict(lm, xValues');
-plot(xValues, yFit, 'r-', 'LineWidth', 2, 'DisplayName', 'r=0.309, p_{spin} = 0.059');
+plot(xValues, yFit, 'r-', 'LineWidth', 2, 'DisplayName', ...
+    strcat('r=',num2str(rvals.GSCORR_MY), ' p_{spin} =', num2str(p_and_d.GSCORR_MY(1))));
 
 % Plot confidence intervals
 [yPred, delta] = predict(lm, xValues', 'Prediction', 'curve', 'Confidence', 'on');
@@ -148,7 +165,7 @@ hold off;
 
 %}
 
-print('E:/EIB/FIGURES/Global_Dist','-dpng','-r300');
+%print('E:/EIB/FIGURES/Global_Dist','-dpng','-r300');
 
 %% Self and Nonself
 INT = sort([108, 220, 120, 302, 286, 291, 148, 63, 258, 189]) ;
@@ -270,10 +287,10 @@ xTitle = {'ACW', 'GSCORR'} ;
         index = mod(k-1, numel(xTitle)) + 1;
         if k == 1 || k == 2
         f = fig_subplot(dataTable.Myelin(logical(dataTable.Class1)), ...
-            table2array(dataTable(logical(dataTable.Class1),index)), col, r, p, xTitle{index}) ;
+            table2array(dataTable(logical(dataTable.Class1),index+1)), col, r, p, xTitle{index}) ;
         else
         f = fig_subplot(dataTable.Myelin(~logical(dataTable.Class1)), ...
-            table2array(dataTable(~logical(dataTable.Class1),index)), col, r, p, xTitle{index}) ;
+            table2array(dataTable(~logical(dataTable.Class1),index+1)), col, r, p, xTitle{index}) ;
         end
     end
 
