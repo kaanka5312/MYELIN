@@ -4,19 +4,16 @@
 % Adding toolboxes and data paths
 addpath("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/")
 addpath("C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/Matlab/")
-% loading the data 
-load( "E:/EIB/MATLAB_ClassificationApp/MED_TABLE.mat" )
-addpath("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/RegWise.mat")
+%loading the NON bandpassed data 
+%load( "E:/EIB/MATLAB_ClassificationApp/MED_TABLE.mat" ) ;
+%dataTable = movevars(dataTable, 'GSCORR','After','ACW') ;
+%dataTable.Class1(dataTable.Class1==1)=0;
+%dataTable.Class1(dataTable.Class1==2)=1;
 
-dataTable = movevars(dataTable, 'GSCORR','After','ACW') ;
-
-dataTable.Class1(dataTable.Class1==1)=0;
-dataTable.Class1(dataTable.Class1==2)=1;
-
-CORD = load('C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/sphere_HCP.txt') ;
+load("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/HighLowBandpassedINT_halfwidth_detrended_datatable.mat")
 
 % Bandpassed data 
-%{
+
 dataTable = table(Regwise.MY, Regwise.ACW, Regwise.GS, Regwise.G_1,...
     'VariableNames',{'Myelin', 'ACW', 'GSCORR', 'Class1'} ) ;
 
@@ -26,9 +23,10 @@ statusData(strcmp(statusData, 'Non-Self')) = {0};
 statusData(strcmp(statusData, 'Self')) = {1};
 
 dataTable.Class1 = cell2mat(statusData) ;
-%}
+
 
 %% GLOBAL
+CORD = load('C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/sphere_HCP.txt') ;
 perm_id_g = rotate_parcellation(CORD(1:180,:), CORD(181:360,:), 10000 ) ;
 
 % Generates p value from above 
@@ -165,7 +163,7 @@ hold off;
 
 %}
 
-%print('E:/EIB/FIGURES/Global_Dist','-dpng','-r300');
+print('E:/EIB/FIGURES/Global_Dist_bp_dt','-dpng','-r300');
 
 %% Self and Nonself
 INT = sort([108, 220, 120, 302, 286, 291, 148, 63, 258, 189]) ;
@@ -195,6 +193,7 @@ NONSELF = 1:360 ;
 NONSELF = setdiff( NONSELF, SELF) ;
 perm_id_nonself = rotate_parcellation(CORD(NONSELF(1:165),:), CORD(NONSELF(166:end),:), 10000) ;
  
+clear rvals ;
 % = + = + = + = + = + = + S E L F + = + = + = + = + = + = +
 [GS_MY_s_p, GS_MY_s_d] = perm_sphere_p(dataTable.GSCORR(logical(dataTable.Class1),:),...
     dataTable.Myelin(logical(dataTable.Class1),:), perm_id_self, 'spearman') ; %GSCORR and MY
@@ -294,5 +293,5 @@ xTitle = {'ACW', 'GSCORR'} ;
         end
     end
 
-print('E:/EIB/FIGURES/Self_NonSelf','-dpng','-r300');
+print('E:/EIB/FIGURES/Self_NonSelf_bp_dt','-dpng','-r300');
 

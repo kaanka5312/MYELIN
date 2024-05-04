@@ -85,13 +85,13 @@ RegWise$G_1<-factor(RegWise$G_1, levels = c("Self", "Non-Self"))
 
 # 
 test <- readMat("./DATA/MED.mat")
-test2 <- readMat("./DATA/HighLowBandpassedINT_detrended.mat")
+test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth_detrended.mat")
 
 RegWise <- data.frame(MY = test$MED[,3],
-                      ACW = rowMeans(test2$ACW0.halfwidth.dt), 
+                      ACW = rowMeans(test2$ACW0.halfwidth.bp.dt), 
                       GS = rowMeans(test2$GSCORR.arr),
                       G_1 = ifelse(test$MED[,5]=="2","Self","Non-Self") )
-writeMat("./DATA/RegWise.mat", Regwise = RegWise)
+writeMat("./DATA/HighLowBandpassedINT_halfwidth_detrended_datatable.mat", Regwise = RegWise)
 # ACW
 result <- RegWise %>%
   wilcox_test(ACW ~ G_1) %>%
@@ -203,8 +203,8 @@ data_MY<- data.frame(
 self <- as.logical(test$MED[,5]-1)
 
 data_ACW <- data.frame(
-  SELF = colMeans(test2$ACW0.halfwidth[self,]) ,
-  NONSELF = colMeans(test2$ACW0.halfwidth[!self,])
+  SELF = colMeans(test2$ACW0.halfwidth.bp.dt[self,]) ,
+  NONSELF = colMeans(test2$ACW0.halfwidth.bp.dt[!self,])
 )
 
 data_GS <- data.frame(
