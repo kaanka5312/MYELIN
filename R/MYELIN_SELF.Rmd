@@ -85,10 +85,10 @@ RegWise$G_1<-factor(RegWise$G_1, levels = c("Self", "Non-Self"))
 
 # 
 test <- readMat("./DATA/MED.mat")
-test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth.mat")
+test2 <- readMat("./DATA/HighLowBandpassedINT_detrended.mat")
 
 RegWise <- data.frame(MY = test$MED[,3],
-                      ACW = rowMeans(test2$ACW0.halfwidth), 
+                      ACW = rowMeans(test2$ACW0.halfwidth.dt), 
                       GS = rowMeans(test2$GSCORR.arr),
                       G_1 = ifelse(test$MED[,5]=="2","Self","Non-Self") )
 writeMat("./DATA/RegWise.mat", Regwise = RegWise)
