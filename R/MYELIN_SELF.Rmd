@@ -92,6 +92,14 @@ RegWise <- data.frame(MY = test$MED[,3],
                       GS = rowMeans(test2$GSCORR.arr),
                       G_1 = ifelse(test$MED[,5]=="2","Self","Non-Self") )
 writeMat("./DATA/HighLowBandpassedINT_halfwidth_detrended_datatable.mat", Regwise = RegWise)
+
+### FOR ML ####
+data.frame(MY = test$MED[,3],
+           ACW = rowMeans(test2$ACW0.halfwidth.bp.dt), 
+           GS = rowMeans(test2$GSCORR.arr),
+           G_1 = test$MED[,5] ) %>% write.csv(file = "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/REG_BP_DT.csv",
+                row.names = FALSE)
+
 # ACW
 result <- RegWise %>%
   wilcox_test(ACW ~ G_1) %>%
@@ -211,6 +219,19 @@ data_GS <- data.frame(
   SELF = colMeans(test2$GSCORR.arr[self,]) ,
   NONSELF = colMeans(test2$GSCORR.arr[!self,] )
 )
+
+### Data for ML ###
+DAT <- readxl::read_xlsx("./DATA/DAT.xlsx")
+
+data.frame(
+ACW = c(data_ACW$SELF,data_ACW$NONSELF),
+GSCORR = c(data_GS$SELF,data_GS$NONSELF),
+MY = c(data_MY$SELF,data_MY$NONSELF),
+ID = c( c(1:100),c(1:100) ),
+GENDER = DAT$GENDER,
+CLASS = factor(rep(1:2, each = nrow(data_ACW)),levels = c(1,2))
+) %>% write.csv(file = "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/SUBJ_BP_DT.csv",
+                row.names = FALSE)
 
 ### ACW ###
 plot_data <- data.frame(
@@ -613,6 +634,12 @@ d_2<- data.frame( GS_std = standardize(test$MED[,1]) ,
                  MY_std = standardize(test$MED[,3]),
                  G = as.factor(test$MED[,5]))
 
+d_2<- data.frame( GS_std = standardize(RegWise$GS) ,
+                 ACW_std = standardize(RegWise$ACW) ,
+                 MY_std = standardize(RegWise$MY),
+                 G = as.factor(test$MED[,5]))
+
+
 # DAG's
 linear <- dagitty( "dag{ 
 Myelin -> GSCORR }" ) 
@@ -819,7 +846,7 @@ linear_1<- ulam(
   data=d_2, chains = 4, cores = 4, log_lik = TRUE) 
 
 xseq = seq( from=-3 , to=4 , length.out=33 ) 
-mu <- link(linear_1, data = list(MY_std=xseq, G= rep(1,33) ) ) 
+mu <- link(linear_1, data = list(MY_std=xseq, G= rep(2,33) ) ) 
 mu_mean <- apply( mu , 2 , mean ) 
 mu_ci <- apply( mu , 2 , PI , prob=0.97 )
 
@@ -852,8 +879,12 @@ plot( GS ~ mu_resid , data=data.frame(GS = d_2$GS_std[d_2$G==2],
 lines( xseq , mu.mean , lwd=2, col="red" ) 
 shade( mu.PI , xseq )
 # Slope to report 
-(mu.PI[2,1]-mu.PI[1,33]) / xseq[1] - xseq[33] # -3
-(mu.PI[1,1]-mu.PI[2,33]) / xseq[1] - xseq[33] # 0.03
+(mu.PI[1,1]-mu.PI[2,33]) / xseq[1] - xseq[33] # -
+(mu.PI[2,1]-mu.PI[1,33]) / xseq[1] - xseq[33] # 0.03
+
+(max(mu.PI[,1]) - min(mu.PI[,33]) ) / xseq[1] - xseq[33] # -
+(min(mu.PI[,1]) - max(mu.PI[,33]) ) / xseq[1] - xseq[33] # -
+
 
 ############## MY ~ ACW SELF###########
 

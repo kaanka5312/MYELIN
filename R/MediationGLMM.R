@@ -39,6 +39,27 @@ d_subj2 <- list(MY_std = standardize(MY) ,
                 n_subj = 100,
                 n_regions = 360
                 )
+### Bandpassed and detrended data ###
+p1 <- readMat( "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/INT_all.mat" )
+test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth_detrended.mat")
+test <- readMat("./DATA/MED.mat")
+
+MY <- c(t(p1$myelin.all))
+GS <- c(test2$GSCORR.arr) # Careful that this in 360x100 formal already
+ACW0 <- c(test2$ACW0.halfwidth.bp.dt) # Careful that this in 360x100 formal already
+subj <- rep(1:100, each = 360)
+G <- rep(test$MED[,5],100)
+self <- G - 1
+nonself <- 1 - self
+d_subj2 <- list(MY_std = standardize(MY) ,
+                ACW_std = standardize(ACW0) ,
+                GS_std = standardize(GS),
+                G = subj,
+                self = self ,
+                nonself = nonself, 
+                n_subj = 100,
+                n_regions = 360
+)
 
 ######### Synthetic data ######
 # Basic model with GS is only related to myelin with multivariate priors and 
@@ -1058,6 +1079,7 @@ model <- stan_model(stanc_ret = stan_model_object)
 #fit <- sampling(model, data = d, iter = 2000, chains = 4, cores= 4) #Synthetic
 fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4, cores= 6) # Real
 save(fit.mediated, file = "/media/kaansocat/Elements/EIB/DATA/MultMed.RData" )
+save(fit.mediated, file = "C:/Documents and Settings/kaan/Belgelerim/MultMed_bp_dt.RData" )
 
 # If prior predictive want to add during the stan this can be added 
 # However, increase time during code and final size significantly.
@@ -1321,7 +1343,7 @@ legend("topright",               # Position of the legend
        legend = c("Self", "Non-self"), # Text in the legend
        col = c("red", "blue"),   # Colors of the lines in the legend
        lty = c(2, 1),            # Line types
-       cex = 1.5)                # Font size of the legend text                             
+       cex = 1.3)                # Font size of the legend text                             
 
 ########## P R I O R / P O S T    C O R R E L A T I O N ##################
 

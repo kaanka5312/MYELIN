@@ -14,9 +14,10 @@ import pandas as pd
 # Generate synthetic data (replace this with your actual data loading code)
 # X, y = make_classification(n_samples=1000, n_features=20, n_classes=2, weights=[0.5, 0.5], random_state=42)
 
-df = pd.read_csv('E:/EIB/DATA/MED_2.csv')
+df = pd.read_csv('C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/REG_BP_DT.csv')
 X = np.asarray(df.iloc[:, 0:2])
 y = np.asarray(df.iloc[:, 3])
+y = y - 1
 
 # Define the outer cross-validation procedure
 cv_outer = StratifiedKFold(n_splits=10, shuffle=True, random_state=42)

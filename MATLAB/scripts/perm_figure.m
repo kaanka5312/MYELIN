@@ -163,7 +163,7 @@ hold off;
 
 %}
 
-print('E:/EIB/FIGURES/Global_Dist_bp_dt','-dpng','-r300');
+%print('E:/EIB/FIGURES/Global_Dist_bp_dt','-dpng','-r300');
 
 %% Self and Nonself
 INT = sort([108, 220, 120, 302, 286, 291, 148, 63, 258, 189]) ;

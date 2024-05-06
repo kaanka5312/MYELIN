@@ -1,7 +1,6 @@
 # This script produces the figure 1C. It basically performs # # 10x10 nested CV and produces ROC curves.
 
 import numpy as np
-from sklearn.datasets import load_breast_cancer
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import cross_val_score, KFold, train_test_split
 from sklearn.metrics import roc_curve, auc
@@ -14,7 +13,7 @@ import pandas as pd
 # data = load_breast_cancer()
 # X, y = data.data, data.target
 
-df = pd.read_excel('E:/EIB/DATA/DAT.xlsx')
+df = pd.read_csv('C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/SUBJ_BP_DT.csv')
 X = np.asarray(df.iloc[:, [0,1,2,4] ])
 y = np.asarray(df.iloc[:, 5])
 y = y - 1
