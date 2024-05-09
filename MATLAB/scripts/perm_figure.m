@@ -97,8 +97,8 @@ plot(xValues, yPred + delta, 'b--', 'HandleVisibility', 'off');
 plot(xValues, yPred - delta, 'b--', 'HandleVisibility', 'off');
 
 % Customize the plot
-xlabel('ACW-0 (seconds)','FontSize',10);
-ylabel('Intracortical Myelin Content','FontSize',10);
+ylabel('ACW-0 (seconds)','FontSize',10);
+xlabel('Intracortical Myelin Content','FontSize',10);
 %title('Spearman Correlation (p_{spin} < 0.05, r= -0.68)', 'FontSize', 14);
 legend('show', 'FontSize', 10);
 grid on;
@@ -127,9 +127,8 @@ plot(xValues, yPred + delta, 'b--', 'HandleVisibility', 'off');
 plot(xValues, yPred - delta, 'b--', 'HandleVisibility', 'off');
 
 % Customize the plot
-xlabel('GSCORR','FontSize',10);
-ylabel('Intracortical Myelin Content','FontSize',10);
-title('Spearman Correlation (p_{spin} = 0.059, r= 0.309)', 'FontSize', 14);
+ylabel('GSCORR','FontSize',10);
+xlabel('Intracortical Myelin Content','FontSize',10);
 legend('show', 'FontSize', 10);
 grid on;
 hold off;
@@ -163,7 +162,7 @@ hold off;
 
 %}
 
-%print('E:/EIB/FIGURES/Global_Dist_bp_dt','-dpng','-r300');
+print('E:/EIB/FIGURES/Global_Dist_bp_dt','-dpng','-r300');
 
 %% Self and Nonself
 INT = sort([108, 220, 120, 302, 286, 291, 148, 63, 258, 189]) ;

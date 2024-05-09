@@ -28,7 +28,7 @@ library(ggsci)
 
 ```{r, eval=FALSE}
 ###### BRAIN FIGURE ######
-br <- readMat("E:/EIB/MATLAB_ClassificationApp/myDataParcels.mat")
+br <- readMat("./DATA/myDataParcels.mat")
 regions <- matrix(unlist(br$myDataParcels[,1]),1)
 
 suffixToRemove = "_ROI"
@@ -75,7 +75,7 @@ scale_fill_brain2(palette=c("#4DBBD5FF", "#E64B35FF")) +
         axis.text.y = element_blank())
 
 ####### REGION-WISE ##################
-test <- readMat("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/MED.mat")
+test <- readMat("./DATA/MED.mat")
 
 RegWise <- data.frame(test$MED)
 colnames(RegWise) <- c("GS","ACW","MY","H","G_1","G_2")
@@ -192,16 +192,6 @@ colnames(SUBJ_SELF)<-c("ACW","GS","MY")
 SUBJ_NONSELF<-data.frame(subjdat$SUBJ.WISE.NONSELF)
 colnames(SUBJ_NONSELF)<-c("ACW","GS","MY")
 
-data_ACW<- data.frame(
-  SELF = SUBJ_SELF$ACW,
-  NONSELF = SUBJ_NONSELF$ACW
-)
-
-data_GS<- data.frame(
-  SELF = SUBJ_SELF$GS,
-  NONSELF = SUBJ_NONSELF$GS
-)
-
 data_MY<- data.frame(
   SELF = SUBJ_SELF$MY,
   NONSELF = SUBJ_NONSELF$MY
@@ -282,7 +272,7 @@ plot_data %>% cohens_d(formula = Value ~ Group,paired = TRUE)
 PAIR_GS<- ggplot(plot_data, aes(x = Group, y = Value, color = Group)) +
   geom_boxplot(alpha = 0) +  # Hide boxplots for better clarity
   geom_point(position = position_jitter(width = 0.2), size = 1) +
-  labs(title = "SELF>NONSELF",
+  labs(title = "NON-SELF>SELF",
        x = "Group",
        y = "GSCORR",
        color = "Subject") +
@@ -339,20 +329,20 @@ PAIR<-ggarrange(PAIR_MY, PAIR_ACW, PAIR_GS, nrow = 1, common.legend = TRUE)
 PAIR <- annotate_figure(PAIR, top = text_grob("Regions are averaged to subjects", color = "black", face = "bold", size = 14))
 
 FIG_1 <- ggarrange( PAIR, RegWise_DESC, nrow=2,labels = "AUTO",
-                   font.label = list(size=25))
+                   font.label = list(size=25) )
 
 library(png)
 library(webp)
 library(gridExtra)
 library(grid)
 
-plot1 <- readPNG('E:/EIB/FIGURES/Figure-1Ca.png')
-plot2 <- read_webp("E:/EIB/FIGURES/dalle.webp")
+plot1 <- readPNG('./FIGURES/bp_dt_subj.png')
+plot2 <- read_webp("./FIGURES/dalle.webp")
 
 gl = list(gimmick, FIG_1, rasterGrob(plot1), rasterGrob(plot2) )
 
 
-png("E:/EIB/FIGURES/arranged_plot.png",width = 36, height = 27, res = 300, units = "cm")
+png("./FIGURES/arranged_plot.png",width = 36, height = 27, res = 300, units = "cm")
 
 grid.arrange(
   grobs = gl,
@@ -565,13 +555,33 @@ ggsave("E:/EIB/FIGURES/FIG_2.png",
 ACW and myelin content showed strong negative correlation across regions (Spearman correlation, rho = -0.68, p~spin~ <.001, Figure 2 left side), with signifiance (p) value defined with spin permutation test (See, Methods). Although the correlation between GSCORR and myelin showed marginal significance after 10^5^ data shuffles (p~spin~=0.059), with a rho coefficient of 0.31 (Figure 2 right side). 
 
 ```{r Global permutation, out.width='100%',fig.cap="Figure 2. Correlation Analysis of ACW, GSCORR, and Myelin Content Across All Brain Regions. On the left, a strong negative correlation between ACW and myelin content is depicted (Spearman's rho = -0.68, p~spin~ <.001),ascertained using a spin permutation test for statistical significance. On the right, GSCORR's correlation with myelin content demonstrates marginal significance (Spearman's rho = 0.31, p~spin~ = 0.059) after data shuffles 10^5^ times, indicating a nuanced relationship."   }
-knitr::include_graphics("E:/EIB/FIGURES/Global_Dist.png")
+
+# Uncomment to merge plots
+# plot1 <- readPNG("./FIGURES/Global_Dist_bp_dt.png")
+# plot2 <- readPNG("./FIGURES/Self_NonSelf_bp_dt.png")
+# gl = list( rasterGrob(plot1), rasterGrob(plot2) )
+# 
+# 
+# png("./FIGURES/FIG_2.png",width = 36, height = 27, res = 300, units = "cm")
+# 
+# grid.arrange(
+#   grobs = gl,
+#   widths = c(1,1),
+#   layout_matrix = cbind(c(1),
+#                         c(2)
+#                         )
+# )
+# 
+# dev.off()
+
+
+knitr::include_graphics("./FIGURES/Global_Dist_bp_dt.png")
 ```
 
 ## Comparing correlation trends: self vs. non-self regions
 
 ```{r Self permutation, out.width='100%',fig.cap="Figure 3. Different Correlations of Myelin Content with ACW and GSCORR in Self and Non-self Regions. This analysis dissects the relationships within self and non-self classified regions, highlighting a significant negative correlation between myelin content and ACW in self regions (p~spin~<.05, rho=-0.60),  alongside a significant positive correlation between myelin content and GSCORR (p~spin~<.05, rho= 0.53). In contrast, non-self regions exhibit a strong negative correlation between myelin content and ACW comparable to self and global correlations (p~spin~<.05, rho = -0.68). The correlation between GSCORR and myelin in non-self regions is marginally significant and positive, mirroring the global pattern (p~spin~ = 0.06, rho=0.3.These findings suggest that self regions possess a stronger structural-to-functional coupling globally compared to non-self regions. " }
-knitr::include_graphics("E:/EIB/FIGURES/Self_NonSelf.png")
+knitr::include_graphics("./FIGURES/Self_NonSelf_bp_dt.png")
 ```
 
 When regions are divided to self and non-self for correlation analysis, self regions demonstrate strong negative correlation between myelin content and ACW (p~spin~ <.05, rho = -0.60), along with strong positive correlation between myelin content and GSCORR (p~spin~ <.05, rho = 0.53, Figure 3 left side). However, non-self regions demonstrate strong negative correlation between myelin content and ACW, similar to self and global (p~spin~ <.05, rho = -0.68). There is marginal significant positive correlation between GSCORR and myelin similar to global (rho = 0.3, p~spin~=0.066). Results indicate that self regions exhibit strong structural-to-global functional coupling compared to non-self regions.
@@ -759,64 +769,6 @@ dev.off()
 # https://cran.r-project.org/web/packages/bridgesampling/vignettes/bridgesampling_example_stan.html#fitting-the-models
 
 # 
-
-data_model <- list(
-  GS_std = d_2$GS_std,
-  G = as.integer(d_2$G)
-)
-
- m0 <- ulam( 
-  alist( 
-    GS_std ~ dnorm( mu , sigma ) , 
-    mu <- a[G],
-    a[G] ~ dnorm( 0, 0.15 ) ,
-    sigma ~ dexp( 1 ) ) , 
-  data=data_model, chains = 4, cores = 4, log_lik = TRUE)
- 
-stancodem0 <- stancode(m0)
-stanmodelm0 <-stan_model(model_code = stancodem0, model_name = "stanmodel")
-
-stancodem1 <- stancode(linear)
-stancodem1 <- "data{\n    vector[360] GS_std;\n    vector[360] MY_std;\n    int G[360];\n}\nparameters{\n    vector[2] a;\n    vector[2] bMY;\n    real<lower=0> sigma;\n}\nmodel{\n    vector[360] mu;\n    sigma ~ exponential( 1 );\n    bMY ~ normal( 0 , 0.35 );\n    a ~ normal( 0 , 0.15 );\n    for ( i in 1:360 ) {\n        mu[i] = a[G[i]] + bMY[G[i]] * MY_std[i];\n    }\n    GS_std ~ normal( mu , sigma );\n}\ngenerated quantities{\n    vector[360] log_lik;\n    vector[360] mu;\n    for ( i in 1:360 ) {\n        mu[i] = a[G[i]] + bMY[G[i]] * MY_std[i];\n    }\n    for ( i in 1:360 ) log_lik[i] = normal_lpdf( GS_std[i] | mu[i] , sigma );\n}\n\n"
-stanmodelm1 <-stan_model(model_code = stancodem1, model_name = "stanmodel")
-
-stancodem2 <- stancode(mediated)
-stanmodelm2 <-stan_model(model_code = stancodem2, model_name = "stanmodel")
-
-
-data_model <- list(
-  GS_std = d_2$GS_std, 
-  ACW_std = d_2$ACW_std, 
-  MY_std = d_2$MY_std, 
-  G = as.integer(d_2$G)
-)
-
-stanfitH0 <- sampling(stanmodelm0, 
-                      data = data_model,
-                      iter = 50000, warmup = 1000, chains = 4, cores = 4)
-
-stanfitH1 <- sampling(stanmodelm1, 
-                      data = list(
-  GS_std = d_2$GS_std,
-  MY_std = d_2$MY_std, 
-  G = as.integer(d_2$G)
-),
-                      iter = 50000, warmup = 1000, chains = 4, cores = 4)
-
-stanfitH2 <- sampling(stanmodelm2, 
-                      data = data_model,
-                      iter = 50000, warmup = 1000, chains = 4, cores = 4)
-
-m0.bridge <- bridge_sampler(stanfitH0,silent=TRUE)
-linear.bridge <- bridge_sampler(stanfitH1,silent=TRUE)
-mediated.bridge <- bridge_sampler(stanfitH2,silent=TRUE)
-
-m0.error <- error_measures(m0.bridge)$percentage
-linear.error <- error_measures(linear.bridge)$percentage
-mediated.error <- error_measures(mediated.bridge)$percentage
-
-BF02 <- bf(m0.bridge, linear.bridge)
-BF01 <- bf(m0.bridge, linear.bridge)
 
 ```
 
@@ -1072,56 +1024,6 @@ shade( mu.PI , xseq )
 dev.off()
 ```
 
-```{r,eval=FALSE}
-post <- extract.samples( linear )
-post$diff_fm <- post$bMY[,1] - post$bMY[,2]
-precis( post, depth = 2)
-
-library(rethinking) 
-data(WaffleDivorce) 
-d <- WaffleDivorce 
-# standardize variables 
-d$D <- standardize( d$Divorce ) 
-d$M <- standardize( d$Marriage ) 
-d$A <- standardize( d$MedianAgeMarriage )
-
-m5.1 <- quap( alist( D ~ dnorm( mu , sigma ) , mu <- a + bA * A , a ~ dnorm( 0 , 0.2 ) , bA ~ dnorm( 0 , 0.5 ) , sigma ~ dexp( 1 ) ) , data = d )
-
-set.seed(10) 
-prior <- extract.prior( m5.1 ) 
-mu <- link( m5.1 , post=prior , data=list( A=c(-2,2) ) ) 
-plot( NULL , xlim=c(-2,2) , ylim=c(-2,2) ) 
-for ( i in 1:50 ) lines( c(-2,2) , mu[i,] ,col=col.alpha("black",0.4) )
-
-# compute percentile interval of mean 
-A_seq <- seq( from=-3 , to=3.2 , length.out=30 ) 
-mu <- link( m5.1 , data=list(A=A_seq) ) 
-mu.mean <- apply( mu , 2, mean ) 
-mu.PI <- apply( mu , 2 , PI ) # plot it all 
-
-plot( D ~ A , data=d , col=rangi2 ) 
-lines( A_seq , mu.mean , lwd=2 ) 
-shade( mu.PI , A_seq )
-
-abline(lm(mu.mean ~ A_seq), col="blue")
-
-#
-data(Howell1) 
-d.t <- Howell1 
-str(d.t)
-d.t$sex <- ifelse( d.t$male==1 , 2 , 1 )
-
-m5.8 <- quap( alist( height ~ dnorm( mu , sigma ) , mu <- a[sex] , a[sex] ~ dnorm( 178 , 20 ) , sigma ~ dunif( 0 , 50 ) ) , data=d.t ) 
-precis( m5.8 , depth=2 )
-
-random_array <- sample(1:2, 544, replace = TRUE)
-#xseq = seq( from=-3 , to=3 , length.out=544 ) 
-mu <- link(m5.8) 
-mu <- link(m5.8, data = list(sex=random_array)) 
-mu_mean <- apply( mu , 2 , mean ) 
-
-```
-
 ```{r ML results, eval=FALSE}
 # Added manually to the figure 3.
 df <- read_csv("E:/EIB/DATA/performance_table.csv")
@@ -1164,20 +1066,19 @@ ggsave("E:/EIB/FIGURES/ML.png", plot = ML, width = 800, height = 800, dpi = 150,
 ```{r,eval=FALSE}
 library(magick)
 # Example PNG files
-file1 <- "E:/EIB/FIGURES/med_highres.png"
+#file1 <- "E:/EIB/FIGURES/med_highres.png"
 #file2 <- "E:/EIB/FIGURES/linear.png"
-file2 <- "C:/Users/kaan/Desktop/Rplot.png"
+file2 <- "./FIGURES/linear.png"
 #file3 <- "E:/EIB/FIGURES/mediated.png"
-file3 <- "C:/Users/kaan/Desktop/Rplot01.png"
-file4 <- "E:/EIB/FIGURES/prior_l.png"
-file5 <- "E:/EIB/FIGURES/prior_m.png"
-file6 <- "E:/EIB/FIGURES/high_resolution_plot.png"
-file7 <- "E:/EIB/FIGURES/self_posterior.png"
-file8 <- "E:/EIB/FIGURES/nonself_posterior.png"
-
+file3 <- "./FIGURES/mediated.png"
+file4 <- "./FIGURES/prior_l.png"
+file5 <- "./FIGURES/prior_m.png"
+file6 <- "./FIGURES/ceoftab_bp_dt.png"
+file7 <- "./FIGURES/self_residual.png"
+file8 <- "./FIGURES/nonself_residual.png"
 
 # Read the PNG files
-image1 <- image_read(file1)
+#image1 <- image_read(file1)
 image2 <- image_read(file2)
 image3 <- image_read(file3)
 image4 <- image_read(file4)
@@ -1197,24 +1098,23 @@ new_height <- 800
 
 # Resize the image
 resized_image <- image_scale(merged_image_3, geometry = "x800")
-
-last <- image_append(c(image1,resized_image,image6),stack = FALSE)
+image6_resized <- image_scale(image6, geometry = "x800" )
+last <- image_append(c(resized_image,image6_resized),stack = FALSE)
 
 merged_image_4 <- image_append(c(image7, image8), stack = FALSE)
 resized_image_2 <- image_scale(merged_image_4, geometry = "3040x")
 
 last2 <- image_append(c(last,resized_image_2), stack = TRUE)
 
-png("E:/EIB/FIGURES/mediation_last.png", width = 3040, height = 2320, res = 150)
+png("./FIGURES/FIG_3.png", width = 3040, height = 2320, res = 150)
 
 plot(last2)
-text(x = 800, y = 2280, labels = "(B)", xpd = NA, cex=1.8, font=2)
-
-text(x = 800, y = 2280, labels = "(B)", xpd = NA, cex=1.8, font=2)
-text(x = 75, y = 1400, labels = "(D)", xpd = NA, cex=1.8, font=2)
-text(x = 750, y = 1400, labels = "SELF", xpd = NA, cex=1.8, font=2)
-text(x = 1595, y = 1400, labels = "(E)", xpd = NA, cex=1.8, font=2)
-text(x = 2250, y = 1400, labels = "NON-SELF", xpd = NA, cex=1.8, font=2)
+text(x = 50, y = 2280, labels = "(A)", xpd = NA, cex=1.8, font=2)
+text(x = 1595, y = 2280, labels = "(B)", xpd = NA, cex=1.8, font=2)
+text(x = 50, y = 1500, labels = "(D)", xpd = NA, cex=1.8, font=2)
+text(x = 700, y = 1500, labels = "SELF", xpd = NA, cex=1.8, font=2)
+text(x = 1595, y = 1500, labels = "(E)", xpd = NA, cex=1.8, font=2)
+text(x = 2250, y = 1500, labels = "NON-SELF", xpd = NA, cex=1.8, font=2)
 
 
 dev.off()
@@ -1222,7 +1122,7 @@ dev.off()
 ```
 
 ```{r include FIG3,echo=FALSE, out.width='100%',fig.cap="Figure 4. Relation between myelin, INT and GSCORR. A)The Mediating Role of Intrinsic Neural Time Scales in Myelin-GSCORR Association. Analysis reveals that intrinsic neural time scales, as represented by ACW-0, fully mediate the relationship between structural myelin content and functional coupling (GSCORR), with an indirect estimate of 0.245 and a significant p<.001. This mediation holds irrespective of the self or non-self classification of brain regions, indicating no significant moderating effect based on this distinction. Furthermore, the analysis shows no direct interaction between myelin content and GSCORR when ACW in mediator role, highlighting the pivotal role of ACW in bridging structural and functional brain dynamics. B) Bayesian Estimation of Mediation Effects in Self vs. Non-self Regions. This figure contrasts two Bayesian models: one baseline model evaluating the direct relationship between GSCORR and myelin, and an alternative model that posits ACW as a mediator between these variables. Lines showing the prior association between variables. C)In self regions, myelin and GSCORR exhibit a positive correlation, with an 89% confidence interval between 0.17 and 0.78. Introducing ACW as a mediator, the assocation adjusts to 0.08-0.65, with ACW's influence between -0.30 and -0.49, affirming a significant, enduring link between myelin and GSCORR even though ACW's mediation. For non-self regions, the myelin-GSCORR association also shows positively within an 89% interval of 0.21-0.37. With ACW mediation, this range alters to -0.05 to 0.15, and ACW's impact varies from -0.43 to 0.12, suggesting ACW has full mediation in the myelin-GSCORR connection. D) ACW and myelin, has a regression coefficient of -0.65, aligning with previous findings (Figure 3). ACW residuals after Bayesion Regression of myelin from ACW, show a link to GSCORR, averaging at -0.13 with a confidence interval from -0.3 to 0.03. Conversely, regressing ACW from myelin reveals a positive correlation between myelin residuals and GSCORR, with an average of 0.23 and an 89% interval from 0.01 to 0.45. This indicates that in self regions, both myelin and ACW play a causal role, which remains  significant even after adjusting for each predictor. E)This figure reveals a clear negative association between myelin and GSCORR, mediated by ACW, with a regression coefficient of -0.25. The absence of a direct relationship between myelin residuals and GSCORR post-ACW adjustment underscores ACW's primary influence, suggesting full mediation by ACW in non-self regions, contrasting with the partial mediation observed in self regions.  "}
-knitr::include_graphics("E:/EIB/FIGURES/mediation_last.png")
+knitr::include_graphics("./FIGURES/FIG_3.png")
 ```
 
 ## ACW full mediates the relationship between GSCORR and myelin content.
@@ -1237,6 +1137,43 @@ The estimated parameters, which describe how GSCORR relates to myelin and/or ACW
 
 For non-self regions, the connection between myelin and GSCORR similarly falls within an 89% confidence interval of 0.21-0.37, showing a positive correlation. However, when ACW is considered a mediator, the relationship's estimated range shifts to -0.05 to 0.15, with ACW's impact varying from -0.43 to 0.12, indicating ACW's potential to either diminish or enhance the myelin-GSCORR relationship. Figure 4E illustrates this controlled effect, showing the linear relationship between ACW and myelin. Bayesian regression of myelin on ACW reveals a negative association with GSCORR, with an average coefficient of -0.25 and a 89% confidence interval of -0.31 to -0.19. Yet, when regressing ACW from myelin, no significant association is found between myelin residuals and GSCORR, with an average of 0.02 and a narrow interval of -0.03 to 0.07. This suggests that in non-self regions, ACW primarily influences the relationship between myelin and GSCORR, highlighting a dependency of myelin on ACW in this interaction. Results indicates that non-self regions shows a full mediation of ACW between myelin and GSCORR, while self regions shows partial mediation.
 
+```{r}
+library(magick)
+file1 <- "./FIGURES/rho_corr_bp_dt.png"
+file2 <- "./FIGURES/myacw_bp_dt.png"
+file3 <- "./FIGURES/mygs_bp_dt.png"
+file4 <- "./FIGURES/counterfacted_bp_dt.png"
+file5 <- "./FIGURES/priorsubj.png"
+file6 <- "./FIGURES/all2gs_bp_dt.png"
+file7 <- "./FIGURES/medGS.png"
+
+# Read the PNG files
+#image1 <- image_read(file1)
+image1 <- image_read(file1)
+image2 <- image_read(file2)
+image3 <- image_read(file3)
+image4 <- image_read(file4)
+image5 <- image_read(file5)
+image6 <- image_read(file6)
+image7 <- image_read(file7)
+
+merged_image_1 <- image_append(c(image1, image2, image3, image4), stack = FALSE) %>% image_scale(geometry = "1200x")
+
+merged_image_2 <- image_append(c(image5, image6, image7), stack = FALSE) %>% image_scale(geometry = "1200x")
+
+FIG_4 <- image_append(c(merged_image_1, merged_image_2), stack = TRUE)
+
+png("./FIGURES/FIG_4.png", width = 3040, height = 2320, res = 150)
+
+plot(FIG_4)
+text(x = 50, y = 1350, labels = "(A)", xpd = NA, cex=1.8, font=2)
+text(x = 350, y = 1350, labels = "(B)", xpd = NA, cex=1.8, font=2)
+text(x = 650, y = 1350, labels = "(C)", xpd = NA, cex=1.8, font=2)
+text(x = 950, y = 1350, labels = "(D)", xpd = NA, cex=1.8, font=2)
+
+dev.off()
+
+```
 
 ```{r, eval=FALSE}
 
