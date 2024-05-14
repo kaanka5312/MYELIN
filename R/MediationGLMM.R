@@ -1078,7 +1078,11 @@ stan_model_object <- stanc(model_code = stan_syn)
 model <- stan_model(stanc_ret = stan_model_object)
 #fit <- sampling(model, data = d, iter = 2000, chains = 4, cores= 4) #Synthetic
 fit.mediated <- sampling(model, data = d_subj2, iter = 2000, chains = 4, cores= 6) # Real
-save(fit.mediated, file = "/media/kaansocat/Elements/EIB/DATA/MultMed.RData" )
+
+# Without bandpassed and detrended data 
+#save(fit.mediated, file = "/media/kaansocat/Elements/EIB/DATA/MultMed.RData" )
+
+# Bandpassed and detrended data
 save(fit.mediated, file = "C:/Documents and Settings/kaan/Belgelerim/MultMed_bp_dt.RData" )
 
 # If prior predictive want to add during the stan this can be added 
@@ -1104,9 +1108,10 @@ save(fit.mediated, file = "C:/Documents and Settings/kaan/Belgelerim/MultMed_bp_
   } "
 
 ############## PRIOR PREDICTIVE CHECK ################
+load(file = "C:/Documents and Settings/kaan/Belgelerim/MultMed_bp_dt.RData" )
+
 # Compute the model for ACW_std_prior based on the parameters and data
 # Simulate ACW_std_prior from the normal distribution with mu_ACW and sigma_2
-
 a1 <- rnorm(1e3, 0, 0.5 )
 b1 <- rnorm(1e3, 0, 0.5 )
 c1 <- rnorm(1e3, 0, 0.5 )
@@ -1133,7 +1138,7 @@ ACW_sim <- sapply(1:2, function(i) rnorm(1e3,ac1 * self + bc1 * xseq[i] * self +
                                            ac2 * nonself + bc2 * xseq[i] * nonself, sigma_2 ) )
 
 plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
-     xlab = "Standardized ACW", ylab = "Standardized GSCORR", main = "Counterfacted relationship")
+     xlab = "Standardized Myelin", ylab = "Standardized ACW", main = "Possible Prior relationship")
 #lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],1), lwd=2) 
 for (i in 1:200) lines(xseq, ACW_sim[i,],col=col.alpha("black",0.4), lwd=2 )
 
@@ -1144,7 +1149,7 @@ GS_sim <- sapply(1:2, function(i) rnorm(1e3,mean = a1 * self + b1 * xseq[i] * se
                                         sigma) )      
 
 plot(NULL,type = "l", ylim= c(-3,3),xlim=c(-2.5,2.5),
-     xlab = "Standardized ACW", ylab = "Standardized GSCORR", main = "Counterfacted relationship")
+     xlab = "Standardized Myelin", ylab = "Standardized GSCORR", main = "Possible Prior relationship")
 #lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],1), lwd=2) 
 for (i in 1:200) lines(xseq, GS_sim[i,],col=col.alpha("black",0.4), lwd=2 )
 
@@ -1185,8 +1190,6 @@ for (i in 1:4e3) {
   b2_prior[i,] = vary_effect[,5]
   c2_prior[i,] = vary_effect[,6]
 }
-
-
 
 a_self <- apply( a1_prior , 2 , mean ) 
 b_self <- apply( b1_prior , 2 , mean )
@@ -1237,11 +1240,18 @@ for (s in 1:n_subj) {
                                                         sigma_2 )
   ))
   lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[2],0.1)) 
-  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[2],0.01))
+  #shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[2],0.01))
   colMeanPlot[,s] = colMeans(ACW_sim)
   
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2, col = col.alpha("black",0.8))
+
+# For reporting
+# Mean of subjects as black line
+(rowMeans(colMeanPlot)[1] - rowMeans(colMeanPlot)[100]) / (xseq[1] - xseq[100])
+# 89% of lines
+sapply(1:100, function(s) 
+  (colMeanPlot[1,s] - colMeanPlot[100,s])/ (xseq[1] - xseq[100])) %>% HPDI()
 
 #=+=+=+=+=+=+=+=+ S E L F =+=+=+=+=+=+=+=+=+=+ #
 
@@ -1252,10 +1262,17 @@ for (s in 1:n_subj) {
                                                         sigma_2 )
   ))
   lines(xseq, y = colMeans(ACW_sim),col=col.alpha(colors[1],0.1)) 
-  shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[1],0.01))
+  #shade( apply(ACW_sim, 2, PI), xseq, col = col.alpha(colors[1],0.01))
   colMeanPlot[,s] = colMeans(ACW_sim)
 }
 lines(xseq, y = rowMeans(colMeanPlot), lwd=2, lty=2, col = col.alpha("black",0.8))
+
+# For reporting
+# Mean of subjects as black line
+(rowMeans(colMeanPlot)[1] - rowMeans(colMeanPlot)[100]) / (xseq[1] - xseq[100])
+# 89% of lines
+sapply(1:100, function(s) 
+  (colMeanPlot[1,s] - colMeanPlot[100,s])/ (xseq[1] - xseq[100])) %>% HPDI()
 
 
 ############### Total Effect of MY on GSCORR ###################
@@ -1365,6 +1382,13 @@ legend("topleft",               # Position of the legend
        col = c("red", "blue", "black"),   # Colors of the lines in the legend
        lty = c(1, 1, 2),            # Line types
        cex = 1)                # Font size of the legend text      
+
+# For reporting 
+PI(post$Rho_med[,4,5])
+mean(post$Rho_med[,4,5])
+
+PI(post$Rho_med[,1,2])
+mean(post$Rho_med[,1,2])
 
 # Beta values dist. 
 plot(NULL, type = "l", ylim= c(0,5),xlim=c(-2.5,2.5))

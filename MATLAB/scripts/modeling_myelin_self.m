@@ -4,8 +4,8 @@
 
 %----%----%----%----%----%----%----%----%----%----%----%----%----%----%----
 %% Making self regions myelin less than nonself regions
-addpath('G:Drive''ım\Research\Myelin_Self\')
-W = load('G:Drive''ım\Research\Myelin_Self\averageConnectivity_Fpt.mat'); %DTI common matrix
+addpath('C:/Users/kaan/Documents/NatComm2023/MYELIN/MATLAB/func/') ;
+W = load('C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/averageConnectivity_Fpt.mat'); %DTI common matrix
 parcelID = W.parcelIDs ;
 % Being sure that matrix parcel organization as same
 myDataParcels = cell(360,3) ;
@@ -28,7 +28,7 @@ end % 2 is self 1 is nonself
 
 %save("E:/EIB/MATLAB_ClassificationApp/myDataParcels.mat",'myDataParcels') % For later
 %}
-load("E:/EIB/MATLAB_ClassificationApp/myDataParcels.mat",'myDataParcels') % For later
+load("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/myDataParcels.mat",'myDataParcels') % For later
 
 % Reordering self / non self parcels for the organization of DTI Matrix
 
@@ -56,6 +56,9 @@ W(~logical(eye(n))) = (2*360)*(W(~logical(eye(n))) ./ sum(W(~logical(eye(n))), '
 
 nsims = 100;
 
+sim_fmri_subj = zeros(360, 18002, nsims);
+sim_rate_subj = zeros(360, 20002, nsims);
+
 GSCORR_x_normal= zeros(360,nsims);
 GSCORR_fmri_normal = zeros(360,nsims);
 GSCORR_fmri_hrf_normal = zeros(360,nsims);
@@ -63,14 +66,99 @@ GSCORR_fmri_hrf_normal = zeros(360,nsims);
 ACW_x_normal = zeros(360,nsims);
 ACW_bw_normal = zeros(360,nsims);
 ACW_hrf_normal = zeros(360,nsims);
-    parfor i = 1:nsims
+  
+parfor i = 1:nsims
         tic
         %% Set up W
         %% run simulations
         [x,time] = wilsoncowan_RK2(tau, b, W, k, s, C, tspan);
         sim_fmri = bw(x,200,1/100) ;
        % sim_fmri_hrf = hrfconv(x, time, 10/1000)
+        sim_rate_subj(:,:,i) = x ;
+        sim_fmri_subj(:,:,i) = sim_fmri ;
+        toc
+        fprintf("\ni = %d\n", i)
+end
 
+% Define sampling frequency and frequencies for bandpass
+TR = 0.72; % TR of HCP data
+Fs = 1/TR;  % Sampling frequency in Hz, TR is your repetition time in seconds
+lowFreq = 0.01;  % Low cutoff frequency in Hz
+highFreq = 1 / (2 * TR);  % High cutoff frequency in Hz.  Up to Nyquist Frequency
+
+f1 = 0.01 ;
+f2 = 0.69 ;
+Wp1 = f1 / (Fs / 2) ; % Normalizing with Nyquist before filter application
+Wp2 = f2 / (Fs / 2) ; % Normalizing with Nyquist before filter application
+Wp = [Wp1 Wp2];  % Passband: 
+Rp = 0.1 ;     % 0.1 dB passband ripple
+N = 4;      % Filter order
+
+[b, a] = cheby1(N, Rp, Wp, 'bandpass');
+
+% ACW0
+parfor i=1:nsims
+    for t=1:360
+       % ACW with firing rate
+       [ACW0, ~, ~, ~] = acw(sim_rate_subj(t,:,i),100,false);
+       ACW_x_normal(t,i) = ACW0 ;
+    end
+end
+
+parfor i=1:nsims
+    % Downsampling fmri simulation to match with HCP data. TR = 2 sampling
+    % is sampling the 0.5 Hz. Thus our TR = 0.72, thus we will sampling at
+    % Fs (1/Tr). dt = 100 in simulation, so .72 x 100 = 72 should be
+    % downsampling rate.
+    sim_fmri_downsampled = downsample(sim_fmri_subj(:,:,i)', 72)' ;
+    % Detrending the data 
+    sim_fmri_downsampled_dt = detrend(sim_fmri_downsampled) ;
+    % Bandpassing the data
+    filteredData = zeros(size(sim_fmri_downsampled_dt));
+    % Apply the filter to each ROI (each voxel/ROI)
+    for t = 1:size(sim_fmri_downsampled_dt, 1)
+        filteredData(t, :) = filtfilt(b, a, sim_fmri_downsampled_dt(t, :));
+    end
+    
+    % Calculating GS from filtered Data
+    GS_fmri = mean(sim_fmri_downsampled_dt,1) ;
+    GS_fmri_filtered = filtfilt(b, a, GS_fmri);
+    res_corr = corr(filteredData',GS_fmri_filtered') ;
+    %Fisher Z transformaiton
+    GSCORR_fmri_normal(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
+end
+
+parfor i=1:nsims
+    % Downsampling fmri simulation to match with HCP data. TR = 2 sampling
+    % is sampling the 0.5 Hz. Thus our TR = 0.72, thus we will sampling at
+    % Fs (1/Tr). dt = 100 in simulation, so .72 x 100 = 72 should be
+    % downsampling rate.
+    sim_fmri_downsampled = downsample(sim_fmri_subj(:,:,i)', 72)' ;
+    % Detrending the data 
+    %sim_fmri_downsampled_dt = detrend(sim_fmri_downsampled) ;
+    % Bandpassing the data
+    %filteredData = zeros(size(sim_fmri_downsampled_dt));
+    % Apply the filter to each ROI (each voxel/ROI)
+    %for t = 1:size(sim_fmri_downsampled_dt, 1)
+     %   filteredData(t, :) = filtfilt(b, a, sim_fmri_downsampled_dt(t, :));
+    %end
+    
+    % Calculating GS from filtered Data
+    %GS_fmri = mean(sim_fmri_downsampled_dt,1) ;
+    %GS_fmri_filtered = filtfilt(b, a, GS_fmri);
+    %res_corr = corr(filteredData',GS_fmri_filtered') ;
+    %Fisher Z transformaiton
+    %GSCORR_fmri_normal(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
+
+    % Calculating GS from filtered Data
+    GS_fmri = mean(sim_fmri_downsampled,1) ;
+    res_corr = corr(sim_fmri_downsampled',GS_fmri') ;
+    %Fisher Z transformaiton
+    GSCORR_fmri_normal(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr));
+end
+
+    parfor i = 1:nsims
+        
         % GSCORR in firing rate
         GS_x_normal = mean(x,1) ;
         res_corr = corr(x',GS_x_normal') ;
@@ -263,6 +351,9 @@ subplot(2,4,8)
 
 group1 = nanmean( GSCORR_fmri_normal(logical(DtiMyelin(:,1)-1),:),2);
 group2 = nanmean( GSCORR_fmri_normal(~logical(DtiMyelin(:,1)-1),:),2);
+
+group1 = nanmean( GSCORR_fmri_normal(logical(DtiMyelin(:,1)-1),:),1)';
+group2 = nanmean( GSCORR_fmri_normal(~logical(DtiMyelin(:,1)-1),:),1)';
 
 labels = {'Self', 'Non-Self'};
 data_labels = [repmat(labels(1), length(group1), 1); repmat(labels(2), length(group2), 1)];
