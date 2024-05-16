@@ -48,37 +48,12 @@ k = 1;
 tspan = 300;
 dt = 10 / 1000;
 
-
 W = 10.^(W.Fpt); % Matrix Log10 olceginde. Kullanmadan once 10.^ yapmak gerekiyor
 n = length(W);
 W(logical(eye(n))) = 1; % Makes diagonal elemenst equal to 1. 
 W(~logical(eye(n))) = (2*360)*(W(~logical(eye(n))) ./ sum(W(~logical(eye(n))), 'all'));
 
 nsims = 100;
-
-sim_fmri_subj = zeros(360, 18002, nsims);
-sim_rate_subj = zeros(360, 20002, nsims);
-
-GSCORR_x_normal= zeros(360,nsims);
-GSCORR_fmri_normal = zeros(360,nsims);
-GSCORR_fmri_hrf_normal = zeros(360,nsims);
-
-ACW_x_normal = zeros(360,nsims);
-ACW_bw_normal = zeros(360,nsims);
-ACW_hrf_normal = zeros(360,nsims);
-  
-parfor i = 1:nsims
-        tic
-        %% Set up W
-        %% run simulations
-        [x,time] = wilsoncowan_RK2(tau, b, W, k, s, C, tspan);
-        sim_fmri = bw(x,200,1/100) ;
-       % sim_fmri_hrf = hrfconv(x, time, 10/1000)
-        sim_rate_subj(:,:,i) = x ;
-        sim_fmri_subj(:,:,i) = sim_fmri ;
-        toc
-        fprintf("\ni = %d\n", i)
-end
 
 % Define sampling frequency and frequencies for bandpass
 TR = 0.72; % TR of HCP data
@@ -94,7 +69,31 @@ Wp = [Wp1 Wp2];  % Passband:
 Rp = 0.1 ;     % 0.1 dB passband ripple
 N = 4;      % Filter order
 
-[b, a] = cheby1(N, Rp, Wp, 'bandpass');
+[bp, ap] = cheby1(N, Rp, Wp, 'bandpass');
+
+sim_fmri_subj = zeros(360, 18002, nsims);
+sim_rate_subj = zeros(360, 20002, nsims);
+
+GSCORR_x_normal= zeros(360,nsims);
+GSCORR_fmri_normal = zeros(360,nsims);
+%GSCORR_fmri_hrf_normal = zeros(360,nsims);
+
+ACW_x_normal = zeros(360,nsims);
+ACW_bw_normal = zeros(360,nsims);
+%ACW_hrf_normal = zeros(360,nsims);
+  
+parfor i = 1:nsims
+        tic
+        %% run simulations
+        [x,time] = wilsoncowan_RK2(tau, b, W, k, s, C, tspan);
+        sim_fmri = bw(x,200,1/100) ;
+       % sim_fmri_hrf = hrfconv(x, time, 10/1000)
+        sim_rate_subj(:,:,i) = x ;
+        sim_fmri_subj(:,:,i) = sim_fmri ;
+        toc
+        fprintf("\ni = %d\n", i)
+end
+
 
 % ACW0
 parfor i=1:nsims
@@ -117,12 +116,34 @@ parfor i=1:nsims
     filteredData = zeros(size(sim_fmri_downsampled_dt));
     % Apply the filter to each ROI (each voxel/ROI)
     for t = 1:size(sim_fmri_downsampled_dt, 1)
-        filteredData(t, :) = filtfilt(b, a, sim_fmri_downsampled_dt(t, :));
+        filteredData(t, :) = filtfilt(bp, ap, sim_fmri_downsampled_dt(t, :));
     end
     
     % Calculating GS from filtered Data
     GS_fmri = mean(sim_fmri_downsampled_dt,1) ;
-    GS_fmri_filtered = filtfilt(b, a, GS_fmri);
+    GS_fmri_filtered = filtfilt(bp, ap, GS_fmri);
+    res_corr = corr(filteredData',GS_fmri_filtered') ;
+    %Fisher Z transformaiton
+    GSCORR_fmri_normal(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
+end
+
+% Only Bandpassed 
+parfor i=1:nsims
+    % Downsampling fmri simulation to match with HCP data. TR = 2 sampling
+    % is sampling the 0.5 Hz. Thus our TR = 0.72, thus we will sampling at
+    % Fs (1/Tr). dt = 100 in simulation, so .72 x 100 = 72 should be
+    % downsampling rate.
+    sim_fmri_downsampled = downsample(sim_fmri_subj(:,:,i)', 72)' ;
+    % Bandpassing the data
+    filteredData = zeros(size(sim_fmri_downsampled));
+    % Apply the filter to each ROI (each voxel/ROI)
+    for t = 1:size(sim_fmri_downsampled, 1)
+        filteredData(t, :) = filtfilt(bp, ap, sim_fmri_downsampled(t, :));
+    end
+    
+    % Calculating GS from filtered Data
+    GS_fmri = mean(sim_fmri_downsampled,1) ;
+    GS_fmri_filtered = filtfilt(bp, ap, GS_fmri);
     res_corr = corr(filteredData',GS_fmri_filtered') ;
     %Fisher Z transformaiton
     GSCORR_fmri_normal(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
@@ -299,8 +320,8 @@ ylabel('ACW', 'FontSize', 20);
 title('Firing Rate','FontSize',25)
 %}
 
-group1 = nanmean(ACW_x_normal(logical(DtiMyelin(:,1)-1),:),2);
-group2 = nanmean(ACW_x_normal(~logical(DtiMyelin(:,1)-1),:),2);
+group1 = nanmean(ACW_x_normal(logical(DtiMyelin(:,1)-1),:),1)';
+group2 = nanmean(ACW_x_normal(~logical(DtiMyelin(:,1)-1),:),1)';
 
 labels = {'Self', 'Non-Self'};
 data_labels = [repmat(labels(1), length(group1), 1); repmat(labels(2), length(group2), 1)];
@@ -348,9 +369,6 @@ subtitle(['Cohen''s d: ', num2str(effectSize)],"FontSize",15)
 
 % GSCORR with Balloon
 subplot(2,4,8)
-
-group1 = nanmean( GSCORR_fmri_normal(logical(DtiMyelin(:,1)-1),:),2);
-group2 = nanmean( GSCORR_fmri_normal(~logical(DtiMyelin(:,1)-1),:),2);
 
 group1 = nanmean( GSCORR_fmri_normal(logical(DtiMyelin(:,1)-1),:),1)';
 group2 = nanmean( GSCORR_fmri_normal(~logical(DtiMyelin(:,1)-1),:),1)';
@@ -643,8 +661,8 @@ subplot(2,4,4)
 
 % GSCORR with Balloon
 
-group1 = nanmean(GSCORR_fmri_InvScaled(logical(DtiMyelin(:,1)-1),:),2);
-group2 = nanmean(GSCORR_fmri_InvScaled(~logical(DtiMyelin(:,1)-1),:),2);
+group1 = nanmean(GSCORR_fmri_InvScaled(logical(DtiMyelin(:,1)-1),:),1);
+group2 = nanmean(GSCORR_fmri_InvScaled(~logical(DtiMyelin(:,1)-1),:),1);
 
 labels = {'Self', 'Non-Self'};
 data_labels = [repmat(labels(1), length(group1), 1); repmat(labels(2), length(group2), 1)];
