@@ -1,5 +1,6 @@
-addpath('C:/Users/kaan/Documents/NatComm2023/MYELIN/MATLAB/func/') ;
-W = load('C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/averageConnectivity_Fpt.mat'); %DTI common matrix
+source_path = '/home/kaansocat/MYELIN' ;
+addpath(strcat(source_path,'/MATLAB/func/') );
+W = load(strcat(source_path,'/DATA/averageConnectivity_Fpt.mat') ); %DTI common matrix
 parcelID = W.parcelIDs ;
 % Being sure that matrix parcel organization as same
 myDataParcels = cell(360,3) ;
@@ -22,7 +23,7 @@ end % 2 is self 1 is nonself
 
 %save("E:/EIB/MATLAB_ClassificationApp/myDataParcels.mat",'myDataParcels') % For later
 %}
-load("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/myDataParcels.mat",'myDataParcels') % For later
+load(strcat(source_path,'/DATA/myDataParcels.mat'),'myDataParcels') % For later
 
 % Reordering self / non self parcels for the organization of DTI Matrix
 
@@ -60,40 +61,37 @@ N = 4;      % Filter order
 
 nsims = 1000;
 
-%sim_fmri_subj = zeros(360, 18002, nsims);
-%sim_rate_subj = zeros(360, 20002, nsims);
+GSCORR_fmri_normal = zeros(360,nsims);
+GSCORR_fmri_normal_bp = zeros(360,nsims);
+GSCORR_fmri_normal_bp_dt = zeros(360,nsims);
 
-GSCORR_x_InvScaled= zeros(360,nsims);
+ACW_x_normal = zeros(360,nsims);
+ACW_x_normal_bp = zeros(360,nsims);
+ACW_x_normal_bp_dt = zeros(360,nsims);
+
 GSCORR_fmri_InvScaled = zeros(360,nsims);
+GSCORR_fmri_InvScaled_bp = zeros(360,nsims);
+GSCORR_fmri_InvScaled_bp_dt = zeros(360,nsims);
 
 ACW_x_InvScaled = zeros(360,nsims);
-ACW_bw_InvScaled = zeros(360,nsims);
-
+ACW_x_InvScaled_bp = zeros(360,nsims);
+ACW_x_InvScaled_bp_dt = zeros(360,nsims);
 %% Simulation with Wii = 1 
-
 W = 10.^(W.Fpt); % Matrix Log10 olceginde. Kullanmadan once 10.^ yapmak gerekiyor
 n = length(W);
 W(logical(eye(n))) = 1; % Makes diagonal elemenst equal to 1. 
 W(~logical(eye(n))) = (2*360)*(W(~logical(eye(n))) ./ sum(W(~logical(eye(n))), 'all'));
-%% Simulation with different diagonal 
-
-W = 10.^(W.Fpt); % Matrix Log10 olceginde. Kullanmadan once 10.^ yapmak gerekiyor
-n = length(W);
-% Assuming your first array is arr1 with length 360
-arr1 = cell2mat(myDataParcels(:,3)) ;
-% Calculate the inversely related values within the range of 0.3 to 2.5
-arr2_inverse = 2 ./ arr1;
-
-% Scale the values to be within the specified range with a minimum of 0.5
-arr2_scaled = 0.3 + (arr2_inverse - min(arr2_inverse)) / (max(arr2_inverse) - min(arr2_inverse)) * (2.5 - 0.3);
-
-scaled_array_final = arr2_scaled * 360/sum(arr2_scaled) ; 
-
-W(logical(eye(n))) = scaled_array_final ;
-
-W(~logical(eye(n))) = (2*360)*(W(~logical(eye(n))) ./ sum(W(~logical(eye(n))), 'all'));
 
 %% run simulations
+% Those simulations saves the each wilson-cowan simulations.
+% However, size is too big. Thus measures are calculated wihtin each loop
+% in below section
+
+
+%sim_fmri_subj = zeros(360, 18002, nsims);
+%sim_rate_subj = zeros(360, 20002, nsims);
+
+%{
 parfor i = 1:nsims
         tic
         [x,time] = wilsoncowan_RK2(tau, b, W, k, s, C, tspan);
@@ -189,6 +187,100 @@ parfor i=1:nsims
     GSCORR_fmri_InvScaled(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr));
 end
 
+%}
+        %% run simulations
+    parfor i = 1:nsims
+        tic
+        [x,time] = wilsoncowan_RK2(tau, b, W, k, s, C, tspan);
+        sim_fmri = bw(x,200,1/100) ;
+
+        % Downsampling fmri simulation to match with HCP data. TR = 2 sampling
+        % is sampling the 0.5 Hz. Thus our TR = 0.72, thus we will sampling at
+        % Fs (1/Tr). dt = 100 in simulation, so .72 x 100 = 72 should be
+        % downsampling rate.
+
+        sim_fmri_downsampled = downsample(sim_fmri', 72)' ;
+
+        %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+        % Directly saving, without any other processing 
+        %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+        % Calculating GS 
+        GS_fmri_normal = mean(sim_fmri_downsampled,1) ;
+        res_corr = corr(sim_fmri_downsampled',GS_fmri_normal') ;
+        %Fisher Z transformaiton
+        GSCORR_fmri_normal(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
+
+        %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+        %       O N L Y   B A N D P A S S I N G
+        %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+        filteredData = zeros(size(sim_fmri_downsampled));
+       
+        % Apply the filter to each ROI (each voxel/ROI)
+        for t = 1:size(sim_fmri_downsampled, 1)
+            filteredData(t, :) = filtfilt(bp, ap, sim_fmri_downsampled(t, :));
+        end
+        
+        % Calculating GS from filtered Data
+        GS_fmri = mean(sim_fmri_downsampled,1) ;
+        GS_fmri_filtered = filtfilt(bp, ap, GS_fmri);
+        res_corr = corr(filteredData',GS_fmri_filtered') ;
+        % Fisher Z transformaiton
+        GSCORR_fmri_normal_bp(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
+        
+        %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+        % D E T R E N D I N G  +  B A N D P A S S I N G
+        %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+        filteredData = zeros(size(sim_fmri_downsampled));
+       
+        % Apply the filter to each ROI (each voxel/ROI)
+        for t = 1:size(sim_fmri_downsampled, 1)
+            sim_fmri_downsampled_detrended
+            filteredData(t, :) = filtfilt(bp, ap, sim_fmri_downsampled(t, :));
+        end
+        
+        % Calculating GS from filtered Data
+        GS_fmri = mean(sim_fmri_downsampled,1) ;
+        GS_fmri_filtered = filtfilt(bp, ap, GS_fmri);
+        res_corr = corr(filteredData',GS_fmri_filtered') ;
+        % Fisher Z transformaiton
+        GSCORR_fmri_normal_bp(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
+
+
+        % ACW
+        for t=1:360 % Regions
+       % ACW with firing rate
+       [ACW0, ~, ~, ~] = acw(x(t,:),100,false);
+       ACW_x_normal(t,i) = ACW0 ;
+        end
+        toc
+        fprintf("\ni = %d\n", i)
+    end
+
+%% Simulation with different diagonal 
+W = load(strcat(source_path,'/DATA/averageConnectivity_Fpt.mat') ); %DTI common matrix
+W = 10.^(W.Fpt); % Matrix Log10 olceginde. Kullanmadan once 10.^ yapmak gerekiyor
+n = length(W);
+% Assuming your first array is arr1 with length 360
+arr1 = cell2mat(myDataParcels(:,3)) ;
+% Calculate the inversely related values within the range of 0.3 to 2.5
+arr2_inverse = 2 ./ arr1;
+
+% Scale the values to be within the specified range with a minimum of 0.5
+arr2_scaled = 0.3 + (arr2_inverse - min(arr2_inverse)) / (max(arr2_inverse) - min(arr2_inverse)) * (2.5 - 0.3);
+
+scaled_array_final = arr2_scaled * 360/sum(arr2_scaled) ; 
+
+W(logical(eye(n))) = scaled_array_final ;
+
+W(~logical(eye(n))) = (2*360)*(W(~logical(eye(n))) ./ sum(W(~logical(eye(n))), 'all'));
+
+
+
+
+
 %% Figure 
 group1 = nanmean(GSCORR_fmri_InvScaled(logical(DtiMyelin(:,1)-1),:),1)';
 group2 = nanmean(GSCORR_fmri_InvScaled(~logical(DtiMyelin(:,1)-1),:),1)';
@@ -283,53 +375,7 @@ ylim([-4.5,-1.5])
 subtitle(['Cohen''s d: ', num2str(effectSize)],"FontSize",15)
 
 
-        %% run simulations
-    parfor i = 1:nsims
-        tic
-        [x,time] = wilsoncowan_RK2(tau, b, W, k, s, C, tspan);
-        sim_fmri = bw(x,200,1/100) ;
-        %sim_fmri_hrf = hrfconv(x, time, 10/1000)
 
-        % GSCORR in firing rate
-
-        % Downsampling fmri simulation to match with HCP data. TR = 2 sampling
-        % is sampling the 0.5 Hz. Thus our TR = 0.72, thus we will sampling at
-        % Fs (1/Tr). dt = 100 in simulation, so .72 x 100 = 72 should be
-        % downsampling rate.
-        sim_fmri_downsampled = downsample(sim_fmri', 72)' ;
-        % Bandpassing the data
-        filteredData = zeros(size(sim_fmri_downsampled));
-        % Apply the filter to each ROI (each voxel/ROI)
-        for t = 1:size(sim_fmri_downsampled, 1)
-            filteredData(t, :) = filtfilt(bp, ap, sim_fmri_downsampled(t, :));
-        end
-        
-        % Calculating GS from filtered Data
-        GS_fmri = mean(sim_fmri_downsampled,1) ;
-        GS_fmri_filtered = filtfilt(bp, ap, GS_fmri);
-        res_corr = corr(filteredData',GS_fmri_filtered') ;
-        %Fisher Z transformaiton
-        GSCORR_fmri_normal(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
-        
-        % ACW
-        for t=1:360 % Regions
-
-       % ACW with firing rate
-       [ACW0, ~, ~, ~] = acw(x(t,:),100,false);
-       ACW_x_normal(t,i) = ACW0 ;
-
-       % Bw simulation
-       % [ACW0, ~, ~, ~] = acw(sim_fmri_downsampled(t,:),1/2,false);
-       % ACW_bw_InvScaled(t,i) = ACW0 ;
-       
-       % HRF simulation
-       % [ACW0, ~, ~, ~] = acw(sim_fmri_hrf_downsampled(t,:),1/2,false);
-       % ACW_hrf_InvScaled(t,i) = ACW0 ;
-
-        end
-        toc
-        fprintf("\ni = %d\n", i)
-    end
 
 
 
