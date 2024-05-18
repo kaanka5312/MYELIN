@@ -4,8 +4,9 @@
 
 %----%----%----%----%----%----%----%----%----%----%----%----%----%----%----
 %% Making self regions myelin less than nonself regions
-addpath('C:/Users/kaan/Documents/NatComm2023/MYELIN/MATLAB/func/') ;
-W = load('C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/averageConnectivity_Fpt.mat'); %DTI common matrix
+source_path = '/home/kaansocat/MYELIN' ;
+addpath(strcat(source_path,'/MATLAB/func/') );
+W = load(strcat(source_path,'/DATA/averageConnectivity_Fpt.mat') ); %DTI common matrix
 parcelID = W.parcelIDs ;
 % Being sure that matrix parcel organization as same
 myDataParcels = cell(360,3) ;
@@ -28,7 +29,7 @@ end % 2 is self 1 is nonself
 
 %save("E:/EIB/MATLAB_ClassificationApp/myDataParcels.mat",'myDataParcels') % For later
 %}
-load("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/myDataParcels.mat",'myDataParcels') % For later
+load(strcat(source_path,'/DATA/myDataParcels.mat'),'myDataParcels') % For later
 
 % Reordering self / non self parcels for the organization of DTI Matrix
 

@@ -34,15 +34,7 @@ DtiMyelin(i,1) = myDataParcels{index, 2} ;
 DtiMyelin(i,2) = myDataParcels{index, 3} ;
 end
 
-%% Parameters
-b = -2; % Tweat this to have x (firing rate) around 0.4
-tau = 0.1;
-C = 1;
-s = 0; % rest
-k = 1;
-tspan = 300;
-dt = 10 / 1000;
-
+%% 
 % Define sampling frequency and frequencies for bandpass
 TR = 0.72; % TR of HCP data
 Fs = 1/TR;  % Sampling frequency in Hz, TR is your repetition time in seconds
@@ -78,13 +70,15 @@ GSCORR_fmri_InvScaled_bp_dt = zeros(360,nsims);
 ACW_x_InvScaled = zeros(360,nsims);
 %ACW_x_InvScaled_bp = zeros(360,nsims);
 %ACW_x_InvScaled_bp_dt = zeros(360,nsims);
-%% Simulation with Wii = 1 
-W = load(strcat(source_path,'/DATA/averageConnectivity_Fpt.mat') ); %DTI common matrix
-W = 10.^(W.Fpt); % Matrix Log10 olceginde. Kullanmadan once 10.^ yapmak gerekiyor
-n = length(W);
-W(logical(eye(n))) = 1; % Makes diagonal elemenst equal to 1. 
-W(~logical(eye(n))) = (2*360)*(W(~logical(eye(n))) ./ sum(W(~logical(eye(n))), 'all'));
 
+GSCORR_fmri_ZeroW = zeros(360,nsims);
+GSCORR_fmri_ZeroW_bp = zeros(360,nsims);
+GSCORR_fmri_ZeroW_dt = zeros(360,nsims);
+GSCORR_fmri_ZeroW_bp_dt = zeros(360,nsims);
+
+ACW_x_ZeroW = zeros(360,nsims);
+%ACW_x_normal_bp = zeros(360,nsims);
+%ACW_x_normal_bp_dt = zeros(360,nsims);
 %% run simulations
 % Those simulations saves the each wilson-cowan simulations.
 % However, size is too big. Thus measures are calculated wihtin each loop
@@ -191,7 +185,22 @@ parfor i=1:nsims
 end
 
 %}
-        %% run simulations
+%% run simulations
+W = load(strcat(source_path,'/DATA/averageConnectivity_Fpt.mat') ); %DTI common matrix
+W = 10.^(W.Fpt); % Matrix Log10 olceginde. Kullanmadan once 10.^ yapmak gerekiyor
+n = length(W);
+W(logical(eye(n))) = 1; % Makes diagonal elemenst equal to 1. 
+W(~logical(eye(n))) = (2*360)*(W(~logical(eye(n))) ./ sum(W(~logical(eye(n))), 'all'));
+
+%Parameters
+b = -2; % Tweat this to have x (firing rate) around 0.4
+tau = 0.1;
+C = 1;
+s = 0; % rest
+k = 1;
+tspan = 300;
+dt = 10 / 1000;
+
 parfor i = 1:nsims
     tic
     [x,time] = wilsoncowan_RK2(tau, b, W, k, s, C, tspan);
@@ -259,7 +268,6 @@ parfor i = 1:nsims
     res_corr = corr(filteredData',GS_fmri_filtered') ;
     % Fisher Z transformaiton
     GSCORR_fmri_normal_bp_dt(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
-
 
     % ACW
     for t=1:360 % Regions
@@ -372,20 +380,104 @@ parfor i = 1:nsims
     for t=1:360 % Regions
    % ACW with firing rate
    [ACW0, ~, ~, ~] = acw(x(t,:),100,false);
-   ACW_kaan(x(t,:),100,100,false )
    ACW_x_InvScaled(t,i) = ACW0 ;
     end
     toc
     fprintf("\ni = %d\n", i)
 end
 
+%% run simulations
+W(logical(eye(n))) = zeros(1,360) ;
+W(~logical(eye(n))) = (2*360)*(W(~logical(eye(n))) ./ sum(W(~logical(eye(n))), 'all'));
+
+parfor i = 1:nsims
+    tic
+    [x,time] = wilsoncowan_RK2(tau, b, W, k, s, C, tspan);
+    sim_fmri = bw(x,200,1/100) ;
+
+    % Downsampling fmri simulation to match with HCP data. TR = 2 sampling
+    % is sampling the 0.5 Hz. Thus our TR = 0.72, thus we will sampling at
+    % Fs (1/Tr). dt = 100 in simulation, so .72 x 100 = 72 should be
+    % downsampling rate.
+
+    %sim_fmri_downsampled = downsample(sim_fmri', 72)' ;
+    sim_fmri_downsampled = downsample(sim_fmri', 200)' ;
+
+    %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+    % Directly saving, without any other processing 
+    %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+    % Calculating GS 
+    GS_fmri_normal = mean(sim_fmri_downsampled,1) ;
+    res_corr = corr(sim_fmri_downsampled',GS_fmri_normal') ;
+    %Fisher Z transformaiton
+    GSCORR_fmri_ZeroW(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
+
+    %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+    %       O N L Y   B A N D P A S S I N G
+    %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+
+    filteredData = zeros(size(sim_fmri_downsampled));
+    sim_fmri_downsampled_trans = sim_fmri_downsampled' ;
+    % Apply the filter to each ROI (each voxel/ROI)
+    for t = 1:size(sim_fmri_downsampled, 1)
+        filteredData(t, :) = filtfilt(bp, ap, sim_fmri_downsampled_trans(:, t));
+    end
+    
+    % Calculating GS from filtered Data
+    GS_fmri = mean(sim_fmri_downsampled,1) ;
+    GS_fmri_filtered = filtfilt(bp, ap, GS_fmri) ;
+    res_corr = corr(filteredData',GS_fmri_filtered') ;
+    % Fisher Z transformaiton
+    GSCORR_fmri_ZeroW_bp(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
+
+    %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+    %       O N L Y   D E T R E N D I N G
+    %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+    sim_fmri_downsampled_detrended  = detrend(sim_fmri_downsampled')' ;
+    % Calculating GS 
+    GS_fmri_normal = mean(sim_fmri_downsampled_detrended,1) ;
+    res_corr = corr(sim_fmri_downsampled_detrended',GS_fmri_normal') ;
+    %Fisher Z transformaiton
+    GSCORR_fmri_ZeroW_dt(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
+    
+    %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+    % D E T R E N D I N G  +  B A N D P A S S I N G
+    %=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=
+    sim_fmri_downsampled_detrended_trans = sim_fmri_downsampled_detrended' ;
+    filteredData = zeros(size(sim_fmri_downsampled));
+   
+    for t = 1:size(sim_fmri_downsampled, 1)
+        filteredData(t, :) = filtfilt(bp, ap, sim_fmri_downsampled_detrended_trans(:, t)) ;
+    end
+    
+    % Calculating GS from filtered Data
+    GS_fmri = mean(sim_fmri_downsampled_detrended,1) ;
+    GS_fmri_filtered = filtfilt(bp, ap, GS_fmri);
+    res_corr = corr(filteredData',GS_fmri_filtered') ;
+    % Fisher Z transformaiton
+    GSCORR_fmri_ZeroW_bp_dt(:,i) =  0.5 * log((1 + res_corr) ./ (1 - res_corr)); 
+
+    % ACW
+    for t=1:360 % Regions
+    % ACW with firing rate
+    [ACW0, ~, ~, ~] = acw(x(t,:),100,false);
+     ACW_x_ZeroW(t,i) = ACW0 ;
+    end
+    toc
+    fprintf("\ni = %d\n", i)
+end
+
+%% 
 script_name = mfilename('fullpath');
-description = ['This data called as V2, because has a different downsampling' ...
+description = ['This data called as V3, because has a different downsampling' ...
     'to Tr = 2, not to TR = 0.71. This is to compare results with the latest' ...
     'version of the paper'];
 disp('Finished');
-save(strcat(source_path,'/DATA/1000SubjSim_v2.mat') )
+save(strcat(source_path,'/DATA/1000SubjSim_v3.mat') )
+
 %% Figure 
+
     group1 = nanmean(GSCORR_fmri_InvScaled_bp_dt(logical(DtiMyelin(:,1)-1),:),1)';
     group2 = nanmean(GSCORR_fmri_InvScaled_dt(~logical(DtiMyelin(:,1)-1),:),1)';
     
@@ -479,7 +571,12 @@ ylim([-4.5,-1.5])
 subtitle(['Cohen''s d: ', num2str(effectSize)],"FontSize",15)
 %% Plotting 
 % Plotting different values to investigate 
-GSCORR_groups = {'GSCORR_fmri_normal', ...
+GSCORR_groups = {...
+    'GSCORR_fmri_ZeroW',...
+    'GSCORR_fmri_ZeroW_dt',...
+    'GSCORR_fmri_ZeroW_bp',...
+    'GSCORR_fmri_ZeroW_bp_dt',...
+    'GSCORR_fmri_normal', ...
     'GSCORR_fmri_normal_dt', ...
     'GSCORR_fmri_normal_bp',...
     'GSCORR_fmri_normal_bp_dt',...
@@ -491,28 +588,27 @@ GSCORR_groups = {'GSCORR_fmri_normal', ...
 figure;
 set(gcf,'color','w');
 
-for i=1:8   
+for i=1:12   
 transport = eval(GSCORR_groups{i}) ;
 group1 = nanmean(transport(logical(DtiMyelin(:,1)-1),:),1)';
 group2 = nanmean(transport(~logical(DtiMyelin(:,1)-1),:),1)';
-axs = subplot(2,4,i) ; hold on 
+axs = subplot(3,4,i) ; hold on 
 plotEffectSize(group1, group2, GSCORR_groups{i}) ;
 
 end
 
-acw_groups = {'ACW_x_normal', 'ACW_x_InvScaled'} ;
+acw_groups = { 'ACW_x_ZeroW','ACW_x_normal', 'ACW_x_InvScaled'} ;
 
 figure;
 set(gcf,'color','w');
 
-for i=1:2   
+for i=1:3   
 transport = eval(acw_groups{i}) ;
 group1 = nanmean(transport(logical(DtiMyelin(:,1)-1),:),1)';
 group2 = nanmean(transport(~logical(DtiMyelin(:,1)-1),:),1)';
-axs = subplot(1,2,i) ; hold on 
+axs = subplot(1,3,i) ; hold on 
 plotEffectSize(group1, group2, acw_groups{i}) ;
 
 end
-
 
 

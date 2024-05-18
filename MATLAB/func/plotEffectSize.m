@@ -27,20 +27,20 @@ function plotEffectSize(group1, group2, TITLE)
     [h, p, ~, stats] = ttest(group1, group2);
 
     % Annotate significance
-    %{
+    
     if h
-        text(1.5, max([mean(group1), mean(group2)]) + 0.2, '*', 'FontSize', 30, 'HorizontalAlignment', 'center');
+        text(1.5, 4/3 * max([mean(group1), mean(group2)]) , '*', 'FontSize', 30, 'HorizontalAlignment', 'center');
     else
-        text(1.5, max([mean(group1), mean(group2)]) + 0.2, 'ns', 'FontSize', 20, 'HorizontalAlignment', 'center');
+        text(1.5, 4/3 * max([mean(group1), mean(group2)]) , 'ns', 'FontSize', 20, 'HorizontalAlignment', 'center');
     end
-    %}
-
+    
+    %{
     if h
         text(1.5, 0.2 , '*', 'FontSize', 30, 'HorizontalAlignment', 'center');
     else
         text(1.5, 0.2 , 'ns', 'FontSize', 20, 'HorizontalAlignment', 'center');
     end
-
+    %}
     % Calculate Effect Size
     mean1 = mean(group1);
     mean2 = mean(group2);
@@ -54,14 +54,14 @@ function plotEffectSize(group1, group2, TITLE)
     disp(['Cohen''s d: ', num2str(effectSize)]);
 
     % Calculate y-axis limits with padding
-    %{
+    
     yMin = min(y);
     yMax = max(y);
     yRange = yMax - yMin;
     padding = 0.1 * yRange; % 10% padding
     ylim([yMin - padding, yMax + padding]);
-    %}
-    ylim([-0.1, 0.3])
+    
+    %ylim([-0.1, 0.3])
     modifiedString = strrep(TITLE, '_', ' ');
     
     % Set plot properties
