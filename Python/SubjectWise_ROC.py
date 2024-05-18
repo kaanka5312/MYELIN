@@ -13,7 +13,7 @@ import pandas as pd
 # data = load_breast_cancer()
 # X, y = data.data, data.target
 
-df = pd.read_csv('C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/SUBJ_BP_DT.csv')
+df = pd.read_csv('./DATA/SUBJ_BP_DT.csv')
 X = np.asarray(df.iloc[:, [0,1,2,4] ])
 y = np.asarray(df.iloc[:, 5])
 y = y - 1

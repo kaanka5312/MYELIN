@@ -1,14 +1,15 @@
 # Data preparation
 # Averaged over subjects data
-test <- readMat("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/MED.mat")
+test <- readMat("./DATA/MED.mat")
 d_2<- data.frame( GS_std = standardize(test$MED[,1]) ,
                   ACW_std = standardize(test$MED[,2]) ,
                   MY_std = standardize(test$MED[,3]),
                   G = as.factor(test$MED[,5]))
 
 # All subjects and regions. Needed for varying intercept model
-p1 <- readMat( "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/INT_all.mat" )
-p2 <- readMat( "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/GSCORR.mat" )
+p1 <- readMat( "./DATA/INT_all.mat" )
+#p2 <- readMat( "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/GSCORR.mat" )
+p2 <- readMat( "./DATA/DetrendedData.mat" )
 
 ACW0 <- c(t(p1$ACW0.all))
 MY <- c(t(p1$myelin.all))
@@ -39,14 +40,14 @@ d_subj2 <- list(MY_std = standardize(MY) ,
                 n_subj = 100,
                 n_regions = 360
                 )
-### Bandpassed and detrended data ###
+### Detrended data ###
 p1 <- readMat( "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/INT_all.mat" )
-test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth_detrended.mat")
+test2 <- readMat( "./DATA/DetrendedData.mat" )
 test <- readMat("./DATA/MED.mat")
 
 MY <- c(t(p1$myelin.all))
 GS <- c(test2$GSCORR.arr) # Careful that this in 360x100 formal already
-ACW0 <- c(test2$ACW0.halfwidth.bp.dt) # Careful that this in 360x100 formal already
+ACW0 <- c(test2$ACW0.halfwidth.dt) # Careful that this in 360x100 formal already
 subj <- rep(1:100, each = 360)
 G <- rep(test$MED[,5],100)
 self <- G - 1

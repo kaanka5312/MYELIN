@@ -4,14 +4,16 @@
 % Adding toolboxes and data paths
 addpath("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/")
 addpath("C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/Matlab/")
+
+addpath /home/kaansocat/Documents/MATLAB/rotate_parcellation-master/Matlab
 %loading the NON bandpassed data 
 %load( "E:/EIB/MATLAB_ClassificationApp/MED_TABLE.mat" ) ;
 %dataTable = movevars(dataTable, 'GSCORR','After','ACW') ;
 %dataTable.Class1(dataTable.Class1==1)=0;
 %dataTable.Class1(dataTable.Class1==2)=1;
 
-load("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/HighLowBandpassedINT_halfwidth_detrended_datatable.mat")
-
+%load("C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/HighLowBandpassedINT_halfwidth_detrended_datatable.mat")
+load /home/kaansocat/MYELIN/DATA/INT_halfwidth_detrended_datatable.mat
 % Bandpassed data 
 
 dataTable = table(Regwise.MY, Regwise.ACW, Regwise.GS, Regwise.G_1,...
@@ -26,8 +28,35 @@ dataTable.Class1 = cell2mat(statusData) ;
 
 
 %% GLOBAL
-CORD = load('C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/sphere_HCP.txt') ;
+%CORD = load('C:/Users/kaan/Documents/MATLAB/rotate_parcellation-master/rotate_parcellation-master/sphere_HCP.txt') ;
 perm_id_g = rotate_parcellation(CORD(1:180,:), CORD(181:360,:), 10000 ) ;
+
+parpool;  % This starts the default parallel pool
+% Load your coordinate data
+CORD = load('/home/kaansocat/Documents/MATLAB/rotate_parcellation-master/sphere_HCP.txt') ;
+
+% Preallocate a cell array or other suitable data structure for the results
+results = cell(1, 10);  % Assuming you want to run 10 parallel jobs
+
+% Start a parfor loop to run operations in parallel
+parfor idx = 1:10
+    % Define the subset or parameters for this iteration
+    start_idx_1 = 1 + (idx-1) * 18;  % Example partitioning for CORD(1:180,:)
+    end_idx_1 = idx * 18;
+    start_idx_2 = 181 + (idx-1) * 18;  % Example partitioning for CORD(181:360,:)
+    end_idx_2 = 180 + idx * 18;
+
+    % Call your function with the subset or specific parameters
+    results{idx} = rotate_parcellation(CORD(start_idx_1:end_idx_1, :), CORD(start_idx_2:end_idx_2, :), 10000);
+end
+% Now results cell array contains all the results from the parallel computations
+% Initialize an empty matrix to store the combined results
+combinedResults = [];
+
+% Concatenate results along columns
+for idx = 1:length(results)
+    combinedResults = [combinedResults; results{idx}];
+end
 
 % Generates p value from above 
 %[GS_MY_p, GS_MY_d] = perm_sphere_p(MED(:,1), MED(:,3), perm_id_g, 'spearman') ; %GSCORR and MY

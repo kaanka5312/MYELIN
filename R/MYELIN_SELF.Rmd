@@ -29,35 +29,34 @@ library(ggsci)
 ```{r, eval=FALSE}
 ###### BRAIN FIGURE ######
 br <- readMat("./DATA/myDataParcels.mat")
-regions <- matrix(unlist(br$myDataParcels[,1]),1)
+regions <- matrix(unlist(br$myDataParcels[, 1]), 1)
 
-suffixToRemove = "_ROI"
+suffixtoremove <- "_ROI"
 
-modifiedStrings <- character(length(regions))
+modifiedstrings <- character(length(regions))
 
-group = matrix(unlist(br$myDataParcels[,2]),1)
+group <- matrix(unlist(br$myDataParcels[, 2]), 1)
 
-plot_brain <- data.frame(region = matrix(modifiedStrings),
-           group = factor(matrix(group)),
-           HEMIS = c(rep("R", 180),rep("L",180)),
-           region_to_fill = factor(c(1:360)),
-           stringsAsFactors = FALSE
+plot_brain <- data.frame(region = matrix(modifiedstrings),
+  group = factor(matrix(group)),
+  HEMIS = c(rep("R", 180),rep("L",180)),
+  region_to_fill = factor(c(1:360)),
+  stringsAsFactors = FALSE
 )
 
 for (i in seq_along(regions)) {
-  modifiedStrings[i] <- str_replace(regions[i], suffixToRemove, "")
+  modifiedstrings[i] <- str_replace(regions[i], suffixtoremove, "")
 }
 
 for (i in c(1:180)) {
   prefixToRemove = "R_"
-  plot_brain$region[i] <- sub(paste0("^", prefixToRemove), "", modifiedStrings[i])
+  plot_brain$region[i] <- sub(paste0("^", prefixToRemove), "", modifiedstrings[i])
 }
 
 for (i in c(181:360)) {
   prefixToRemove = "L_"
-  plot_brain$region[i] <- sub(paste0("^", prefixToRemove), "", modifiedStrings[i])
+  plot_brain$region[i] <- sub(paste0("^", prefixToRemove), "", modifiedstrings[i])
 }
-
 
 library(ggseg) ; library(ggsegGlasser)
 
@@ -74,34 +73,31 @@ scale_fill_brain2(palette=c("#4DBBD5FF", "#E64B35FF")) +
         axis.ticks.y = element_blank(),
         axis.text.y = element_blank())
 
-####### REGION-WISE ##################
+####### REGION-WISE ################## 
 test <- readMat("./DATA/MED.mat")
+# test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth_detrended.mat")
+# test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth_detrended_3.mat")
+test2 <- readMat("/home/kaansocat/MYELIN/DATA/DetrendedData.mat")
 
-RegWise <- data.frame(test$MED)
-colnames(RegWise) <- c("GS","ACW","MY","H","G_1","G_2")
-RegWise$G_2<-factor(RegWise$G_2)
-RegWise$G_1<-ifelse(RegWise$G_1=="2","Self","Non-Self")
-RegWise$G_1<-factor(RegWise$G_1, levels = c("Self", "Non-Self"))
-
-# 
-test <- readMat("./DATA/MED.mat")
-#test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth_detrended.mat")
-test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth_detrended_3.mat")
-
-
-RegWise <- data.frame(MY = test$MED[,3],
-                      ACW = rowMeans(test2$ACW0.halfwidth.bp.dt), 
+RegWise <- data.frame(MY = test$MED[, 3],
+                      ACW = rowMeans(test2$ACW0.halfwidth.dt),
                       GS = rowMeans(test2$GSCORR.arr),
-                      G_1 = ifelse(test$MED[,5]=="2","Self","Non-Self") )
-writeMat("./DATA/HighLowBandpassedINT_halfwidth_detrended_datatable.mat", Regwise = RegWise)
+                      G_1 = ifelse(test$MED[, 5] == "2", "Self", "Non-Self"))
+
+#writeMat("./DATA/HighLowBandpassedINT_halfwidth_detrended_datatable.mat", Regwise = RegWise)
+writeMat("./DATA/INT_halfwidth_detrended_datatable.mat", Regwise = RegWise)
 
 ### FOR ML ####
-data.frame(MY = test$MED[,3],
-           ACW = rowMeans(test2$ACW0.halfwidth.bp.dt), 
-           GS = rowMeans(test2$GSCORR.arr),
-           G_1 = test$MED[,5] ) %>% write.csv(file = "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/REG_BP_DT.csv",
-                row.names = FALSE)
-
+data.frame(
+  MY = test$MED[, 3],
+  ACW = rowMeans(test2$ACW0.halfwidth.dt),
+  GS = rowMeans(test2$GSCORR.arr),
+  G_1 = test$MED[, 5]
+) %>%
+  write.csv(
+    file = "./DATA/REG_BP_DT.csv",
+    row.names = FALSE
+  )
 # ACW
 result <- RegWise %>%
   wilcox_test(ACW ~ G_1) %>%
@@ -109,13 +105,13 @@ result <- RegWise %>%
 
 RegWise %>% wilcox_effsize(ACW ~ G_1)
 
-result <- result %>% add_xy_position(group ="GS_1",dodge = 0.8)
+result <- result %>% add_xy_position(group = "GS_1", dodge = 0.8)
 
-boxp <- RegWise %>% ggviolin( x = "G_1", y = "ACW", add = "median_iqr",
-                              color = "G_1", palette = "npg", size=2) 
+boxp <- RegWise %>% ggviolin(x = "G_1", y = "ACW", add = "median_iqr",
+                             color = "G_1", palette = "npg", size = 2)
 
 boxp_ACW <- boxp + stat_pvalue_manual(
-  result, label = "{p.signif}", tip.length = 0,size=6,step.increase = 0.05
+  result, label = "{p.signif}", tip.length = 0, size = 6, step.increase = 0.05
 )  + xlab("") + theme(legend.position = "none") + theme(
   text = element_text(size = 10),          # Overall text size
   axis.title = element_text(size = 15),    # Axis title size
@@ -137,12 +133,21 @@ result <- RegWise %>%
 
 RegWise %>% wilcox_effsize(MY ~ G_1)
 
-result <- result %>% add_xy_position(group ="GS_1",dodge = 0.8)
+result <- result %>% add_xy_position(group = "GS_1", dodge = 0.8)
 
-boxp <- RegWise %>% ggviolin( x = "G_1", y = "MY", add = "median_iqr",color = "G_1" , size=2) + scale_color_npg()
+boxp <- RegWise %>%
+  ggviolin(
+    x = "G_1",
+    y = "MY",
+    add = "median_iqr",
+    color = "G_1",
+    size = 2
+  ) +
+  scale_color_npg()
+
 
 boxp_MY <- boxp + stat_pvalue_manual(
-  result, label = "{p.signif}", tip.length = 0,size=6,step.increase = 0.05
+  result, label = "{p.signif}", tip.length = 0, size = 6, step.increase = 0.05
 )  + xlab("") + theme(legend.position = "none") + theme(
   text = element_text(size = 10),          # Overall text size
   axis.title = element_text(size = 15),    # Axis title size
@@ -161,12 +166,21 @@ result <- RegWise %>%
 
 RegWise %>% wilcox_effsize(GS ~ G_1)
 
-result <- result %>% add_xy_position(group ="GS_1",dodge = 0.8)
+result <- result %>% add_xy_position(group = "GS_1", dodge = 0.8)
 
-boxp <- RegWise %>% ggviolin( x = "G_1", y = "GS", add = "median_iqr",color = "G_1" , size=2) + scale_color_npg() + ylab("GSCORR")
+boxp <- RegWise %>%
+  ggviolin(
+    x = "G_1",
+    y = "GS",
+    add = "median_iqr",
+    color = "G_1",
+    size = 2
+  ) +
+  scale_color_npg() +
+  ylab("GSCORR")
 
 boxp_GS <- boxp + stat_pvalue_manual(
-  result, label = "{p.signif}", tip.length = 0,size=6,step.increase = 0.05
+  result, label = "{p.signif}", tip.length = 0, size = 6, step.increase = 0.05
 )  + xlab("") + theme(legend.position = "none") + theme(
   text = element_text(size = 10),          # Overall text size
   axis.title = element_text(size = 15),    # Axis title size
@@ -177,91 +191,125 @@ boxp_GS <- boxp + stat_pvalue_manual(
 )
 
 
-RegWise_DESC <- ggarrange(boxp_MY,boxp_ACW,boxp_GS,ncol=3)
+RegWise_DESC <- ggarrange(boxp_MY, boxp_ACW, boxp_GS, ncol=3)
 
-RegWise_DESC <- annotate_figure(RegWise_DESC, top = text_grob("Subjects are averaged to regions", color = "black", face = "bold", size = 14))
-
+RegWise_DESC <- annotate_figure(
+  RegWise_DESC,
+  top = text_grob(
+    "Subjects are averaged to regions",
+    color = "black",
+    face = "bold",
+    size = 14
+  )
+)
 
 ##### SUBJ_WISE ###############
-subjdat<-readMat("./DATA/SUBJ_WISE.mat")
+subjdat <- readMat("./DATA/SUBJ_WISE.mat")
 
-SUBJ_GLOB<-data.frame(subjdat$SUBJ.WISE.GLOBAL)
-colnames(SUBJ_GLOB)<-c("ACW","GS","MY")
+SUBJ_GLOB <- data.frame(subjdat$SUBJ.WISE.GLOBAL)
+colnames(SUBJ_GLOB) <- c("ACW", "GS", "MY")
 
 SUBJ_SELF<-data.frame(subjdat$SUBJ.WISE.SELF)
-colnames(SUBJ_SELF)<-c("ACW","GS","MY")
+colnames(SUBJ_SELF) <- c("ACW", "GS", "MY")
 
-SUBJ_NONSELF<-data.frame(subjdat$SUBJ.WISE.NONSELF)
-colnames(SUBJ_NONSELF)<-c("ACW","GS","MY")
+SUBJ_NONSELF <- data.frame(subjdat$SUBJ.WISE.NONSELF)
+colnames(SUBJ_NONSELF) <- c("ACW", "GS", "MY")
 
-data_MY<- data.frame(
+data_MY <- data.frame(
   SELF = SUBJ_SELF$MY,
   NONSELF = SUBJ_NONSELF$MY
 )
 
 ##
-self <- as.logical(test$MED[,5]-1)
+self <- as.logical(test$MED[, 5] - 1)
 
 data_ACW <- data.frame(
-  SELF = colMeans(test2$ACW0.halfwidth.bp.dt[self,]) ,
-  NONSELF = colMeans(test2$ACW0.halfwidth.bp.dt[!self,])
+  SELF = colMeans(test2$ACW0.halfwidth.dt[self, ]),
+  NONSELF = colMeans(test2$ACW0.halfwidth.dt[!self, ])
 )
 
 data_GS <- data.frame(
-  SELF = colMeans(test2$GSCORR.arr[self,]) ,
-  NONSELF = colMeans(test2$GSCORR.arr[!self,] )
+  SELF = colMeans(test2$GSCORR.arr[self, ]),
+  NONSELF = colMeans(test2$GSCORR.arr[!self, ])
 )
 
 ### Data for ML ###
+# Read data from Excel file
 DAT <- readxl::read_xlsx("./DATA/DAT.xlsx")
 
-data.frame(
-ACW = c(data_ACW$SELF,data_ACW$NONSELF),
-GSCORR = c(data_GS$SELF,data_GS$NONSELF),
-MY = c(data_MY$SELF,data_MY$NONSELF),
-ID = c( c(1:100),c(1:100) ),
-GENDER = DAT$GENDER,
-CLASS = factor(rep(1:2, each = nrow(data_ACW)),levels = c(1,2))
-) %>% write.csv(file = "C:/Users/kaan/Documents/NatComm2023/MYELIN/DATA/SUBJ_BP_DT.csv",
-                row.names = FALSE)
+# Create a data frame and combine variables
+data_combined <- data.frame(
+  ACW = c(data_ACW$SELF, data_ACW$NONSELF),
+  GSCORR = c(data_GS$SELF, data_GS$NONSELF),
+  MY = c(data_MY$SELF, data_MY$NONSELF),
+  ID = c(1:100, 1:100),
+  GENDER = DAT$GENDER,
+  CLASS = factor(rep(1:2, each = nrow(data_ACW)), levels = c(1, 2))
+)
+
+# Write the combined data frame to a CSV file
+write.csv(
+  x = data_combined,
+  file = "./DATA/SUBJ_BP_DT.csv",
+  row.names = FALSE
+)
+
 
 ### ACW ###
 plot_data <- data.frame(
   Subject = rep(seq_len(nrow(data_ACW)), 2),
-  Group = factor(rep(c("SELF", "NONSELF"), each = nrow(data_ACW)),levels = c("SELF","NONSELF")),
+  Group = factor(
+    rep(c("SELF", "NONSELF"), each = nrow(data_ACW)),
+    levels = c("SELF", "NONSELF")
+  ),
   Value = c(data_ACW$SELF, data_ACW$NONSELF)
 )
 
-# For reporting 
-plot_data %>% t_test(formula = Value ~ Group,paired = TRUE)
-plot_data %>% cohens_d(formula = Value ~ Group,paired = TRUE)
+# For reporting
+plot_data %>% t_test(formula = Value ~ Group, paired = TRUE)
+plot_data %>% cohens_d(formula = Value ~ Group, paired = TRUE)
 
 # Plot the paired observations with lines connecting data points for each subject
-PAIR_ACW<- ggplot(plot_data, aes(x = Group, y = Value, color = Group)) +
+
+PAIR_ACW <- ggplot(plot_data, aes(x = Group, y = Value, color = Group)) +
   geom_boxplot(alpha = 0) +  # Hide boxplots for better clarity
   geom_point(position = position_jitter(width = 0.2), size = 1) +
-  labs(title = "SELF>NONSELF",
-       x = "Group",
-       y = "ACW",
-       color = "Subject") +
-  stat_compare_means(method = "t.test",paired = TRUE,label = "p.signif") +
+  labs(
+    title = "SELF>NONSELF",
+    x = "Group",
+    y = "ACW",
+    color = "Subject"
+  ) +
+  stat_compare_means(
+    method = "t.test",
+    paired = TRUE,
+    label = "p.signif"
+  ) +
   theme_minimal() + 
   scale_color_npg() +
-  geom_line(aes(group = Subject), alpha = 0.7, color = "gray",linewidth=0.9) +
+  geom_line(
+    aes(group = Subject),
+    alpha = 0.7,
+    color = "gray",
+    linewidth = 0.9
+  ) +
   theme(
-  text = element_text(size = 10),          # Overall text size
-  axis.title = element_text(size = 14),    # Axis title size
-  axis.text = element_text(size = 10),     # Axis text size
-  legend.title = element_text(size = 16),  # Legend title size
-  legend.text = element_text(size = 14),   # Legend text size
-  plot.title = element_text(size = 10),    # Plot title size
-)
+    text = element_text(size = 10),          # Overall text size
+    axis.title = element_text(size = 14),    # Axis title size
+    axis.text = element_text(size = 10),     # Axis text size
+    legend.title = element_text(size = 16),  # Legend title size
+    legend.text = element_text(size = 14),   # Legend text size
+    plot.title = element_text(size = 10)     # Plot title size
+  )
 
 
 ### GS ###
 plot_data <- data.frame(
   Subject = rep(seq_len(nrow(data_GS)), 2),
-  Group = factor(rep(c("SELF", "NONSELF"), each = nrow(data_ACW)),levels = c("SELF","NONSELF")),
+  Group = factor(
+    rep(c("SELF", "NONSELF"), each = nrow(data_ACW)),
+    levels = c("SELF", "NONSELF")
+  ),
   Value = c(data_GS$SELF, data_GS$NONSELF)
 )
 
@@ -271,80 +319,119 @@ plot_data %>% cohens_d(formula = Value ~ Group,paired = TRUE)
 
 
 # Plot the paired observations with lines connecting data points for each subject
-PAIR_GS<- ggplot(plot_data, aes(x = Group, y = Value, color = Group)) +
+PAIR_GS <- ggplot(plot_data, aes(x = Group, y = Value, color = Group)) +
   geom_boxplot(alpha = 0) +  # Hide boxplots for better clarity
   geom_point(position = position_jitter(width = 0.2), size = 1) +
-  labs(title = "NON-SELF>SELF",
-       x = "Group",
-       y = "GSCORR",
-       color = "Subject") +
-  stat_compare_means(method = "t.test",paired = TRUE,label = "p.signif") +
-  theme_minimal()+ 
+  labs(
+    title = "NON-SELF > SELF",
+    x = "Group",
+    y = "GSCORR",
+    color = "Subject"
+  ) +
+  stat_compare_means(
+    method = "t.test",
+    paired = TRUE,
+    label = "p.signif"
+  ) +
+  theme_minimal() + 
   scale_color_npg() +
-  geom_line(aes(group = Subject), alpha = 0.7, color = "gray",linewidth=0.9) +  theme(
-  text = element_text(size = 10),          # Overall text size
-  axis.title = element_text(size = 14),    # Axis title size
-  axis.text = element_text(size = 10),     # Axis text size
-  legend.title = element_text(size = 16),  # Legend title size
-  legend.text = element_text(size = 14),   # Legend text size
-  plot.title = element_text(size = 10),    # Plot title size
-)
+  geom_line(
+    aes(group = Subject),
+    alpha = 0.7,
+    color = "gray",
+    linewidth = 0.9
+  ) +  
+  theme(
+    text = element_text(size = 10),          # Overall text size
+    axis.title = element_text(size = 14),    # Axis title size
+    axis.text = element_text(size = 10),     # Axis text size
+    legend.title = element_text(size = 16),  # Legend title size
+    legend.text = element_text(size = 14),   # Legend text size
+    plot.title = element_text(size = 10)     # Plot title size
+  )
 
+t.test(data_GS$SELF, data_GS$NONSELF, paired = TRUE)
 
-
-t.test(data_GS$SELF,data_GS$NONSELF,paired = TRUE)
 ### Myelin ###
 
 plot_data <- data.frame(
   Subject = rep(seq_len(nrow(data_MY)), 2),
-  Group = factor(rep(c("SELF", "NONSELF"), each = nrow(data_ACW)),levels = c("SELF","NONSELF")),
+  Group = factor(
+    rep(c("SELF", "NONSELF"), each = nrow(data_ACW)),
+    levels = c("SELF", "NONSELF")
+  ),
   Value = c(data_MY$SELF, data_MY$NONSELF)
 )
 
-# For reporting 
-plot_data %>% t_test(formula = Value ~ Group,paired = TRUE)
-plot_data %>% cohens_d(formula = Value ~ Group,paired = TRUE)
+# For reporting
+plot_data %>% t_test(formula = Value ~ Group, paired = TRUE)
+plot_data %>% cohens_d(formula = Value ~ Group, paired = TRUE)
 
 # Plot the paired observations with lines connecting data points for each subject
-PAIR_MY<- ggplot(plot_data, aes(x = Group, y = Value, color = Group)) +
+PAIR_MY <- ggplot(plot_data, aes(x = Group, y = Value, color = Group)) +
   geom_boxplot(alpha = 0) +  # Hide boxplots for better clarity
   geom_point(position = position_jitter(width = 0.2), size = 1) +
-  labs(title = "NONSELF>SELF",
-       x = "Group",
-       y = "MY",
-       color = "Subject") +
-  stat_compare_means(method = "t.test",paired = TRUE,label = "p.signif") +
+  labs(
+    title = "NONSELF > SELF",
+    x = "Group",
+    y = "MY",
+    color = "Subject"
+  ) +
+  stat_compare_means(
+    method = "t.test",
+    paired = TRUE,
+    label = "p.signif"
+  ) +
   theme_minimal() +
   scale_color_npg() +
-  geom_line(aes(group = Subject), alpha = 0.7, color = "gray",linewidth=0.9) +  theme(
-  text = element_text(size = 10),          # Overall text size
-  axis.title = element_text(size = 14),    # Axis title size
-  axis.text = element_text(size = 10),     # Axis text size
-  legend.title = element_text(size = 16),  # Legend title size
-  legend.text = element_text(size = 14),   # Legend text size
-  plot.title = element_text(size = 10),    # Plot title size
+  geom_line(
+    aes(group = Subject),
+    alpha = 0.7,
+    color = "gray",
+    linewidth = 0.9
+  ) +  
+  theme(
+    text = element_text(size = 10),          # Overall text size
+    axis.title = element_text(size = 14),    # Axis title size
+    axis.text = element_text(size = 10),     # Axis text size
+    legend.title = element_text(size = 16),  # Legend title size
+    legend.text = element_text(size = 14),   # Legend text size
+    plot.title = element_text(size = 10)     # Plot title size
+  )
+
+
+PAIR <- ggarrange(PAIR_MY, PAIR_ACW, PAIR_GS, nrow = 1, common.legend = TRUE)
+
+PAIR <- annotate_figure(
+  PAIR,
+  top = text_grob(
+    "Regions are averaged to subjects",
+    color = "black",
+    face = "bold",
+    size = 14
+  )
 )
 
-
-PAIR<-ggarrange(PAIR_MY, PAIR_ACW, PAIR_GS, nrow = 1, common.legend = TRUE)
-
-PAIR <- annotate_figure(PAIR, top = text_grob("Regions are averaged to subjects", color = "black", face = "bold", size = 14))
-
-FIG_1 <- ggarrange( PAIR, RegWise_DESC, nrow=2,labels = "AUTO",
-                   font.label = list(size=25) )
+FIG_1 <- ggarrange(
+  PAIR,
+  RegWise_DESC,
+  nrow = 2,
+  labels = "AUTO",
+  font.label = list(size = 25)
+)
 
 library(png)
 library(webp)
 library(gridExtra)
 library(grid)
 
-plot1 <- readPNG('~/NatComm2023/MYELIN/FIGURES/bp_dt_subj.png')
-plot2 <- read_webp("~/NatComm2023/MYELIN/FIGURES/dalle.webp")
+plot1 <- readPNG("~/MYELIN/FIGURES/bp_dt_subj.png")
+plot2 <- read_webp("~/MYELIN/FIGURES/dalle.webp")
 
-gl = list(gimmick, FIG_1, rasterGrob(plot1), rasterGrob(plot2) )
+gl <- list(gimmick, FIG_1, rasterGrob(plot1), rasterGrob(plot2))
 
 
-png("~/NatComm2023/MYELIN/FIGURES/arranged_plot.png",width = 36, height = 27, res = 300, units = "cm")
+png("~/MYELIN/FIGURES/arranged_plot.png",width = 36, height = 27, res = 300, units = "cm")
 
 grid.arrange(
   grobs = gl,
