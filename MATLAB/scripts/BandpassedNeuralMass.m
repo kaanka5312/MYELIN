@@ -386,50 +386,50 @@ description = ['This data called as V2, because has a different downsampling' ..
 disp('Finished');
 save(strcat(source_path,'/DATA/1000SubjSim_v2.mat') )
 %% Figure 
-group1 = nanmean(GSCORR_fmri_normal_bp_dt(logical(DtiMyelin(:,1)-1),:),1)';
-group2 = nanmean(GSCORR_fmri_normal_bp_dt(~logical(DtiMyelin(:,1)-1),:),1)';
-
-labels = {'Self', 'Non-Self'};
-data_labels = [repmat(labels(1), length(group1), 1); repmat(labels(2), length(group2), 1)];
-
-plot_dat = table([group1;group2], data_labels, 'VariableNames', {'values','class'}) ;
-
-x = categorical(plot_dat.class,labels, 'Ordinal',true) ;
-y = plot_dat.values ;
-c = [ repmat(hex2rgb("E64B35"), length(group1),1); repmat(hex2rgb("4DBBD5"),length(group2),1) ] ;
-
-swarmchart(x, log(y), 100,c, 'filled', 'MarkerFaceAlpha',0.5,'MarkerEdgeAlpha',0.5);
-hold on 
-boxchart(x,log(plot_dat.values) ) ;
-% t test
-[h, p, ~, stats] = ttest2(group1, group2) ;
-
-if h
-    text(1.5, max(log([mean(group1), mean(group2)]) ) + 0.2, '*','FontSize', 30, 'HorizontalAlignment', 'center');
-else
-     text(1.5, max(log([mean(group1), mean(group2)]) ) + 0.2, 'ns','FontSize', 20, 'HorizontalAlignment', 'center');
-end
-
-% Effect-size 
-mean1 = mean(group1);
-mean2 = mean(group2);
-
-std1 = std(group1);
-std2 = std(group2);
-
-n1 = length(group1);
-n2 = length(group2);
-
-pooledStd = sqrt(((n1 - 1) * std1^2 + (n2 - 1) * std2^2) / (n1 + n2 - 2));
-effectSize = (mean1 - mean2) / pooledStd;
-
-disp(['Cohen''s d: ', num2str(effectSize)]);
-
-set(gca, 'FontSize', 15);  % Adjust the font size as needed
-ylabel('log(GSCORR)', 'FontSize', 15);
-title(' Balloon-Windkessel model','FontSize',15)
-ylim([-4.5,-1.5])
-subtitle(['Cohen''s d: ', num2str(effectSize)],"FontSize",15)
+    group1 = nanmean(GSCORR_fmri_InvScaled_bp_dt(logical(DtiMyelin(:,1)-1),:),1)';
+    group2 = nanmean(GSCORR_fmri_InvScaled_dt(~logical(DtiMyelin(:,1)-1),:),1)';
+    
+    labels = {'Self', 'Non-Self'};
+    data_labels = [repmat(labels(1), length(group1), 1); repmat(labels(2), length(group2), 1)];
+    
+    plot_dat = table([group1;group2], data_labels, 'VariableNames', {'values','class'}) ;
+    
+    x = categorical(plot_dat.class,labels, 'Ordinal',true) ;
+    y = plot_dat.values ;
+    c = [ repmat(hex2rgb("E64B35"), length(group1),1); repmat(hex2rgb("4DBBD5"),length(group2),1) ] ;
+    
+    swarmchart(x, y, 100,c, 'filled', 'MarkerFaceAlpha',0.5,'MarkerEdgeAlpha',0.5);
+    hold on 
+    boxchart(x,plot_dat.values ) ;
+    % t test
+    [h, p, ~, stats] = ttest2(group1, group2) ;
+    
+    if h
+        text(1.5, max(log([mean(group1), mean(group2)]) ) + 0.2, '*','FontSize', 30, 'HorizontalAlignment', 'center');
+    else
+         text(1.5, max(log([mean(group1), mean(group2)]) ) + 0.2, 'ns','FontSize', 20, 'HorizontalAlignment', 'center');
+    end
+    
+    % Effect-size 
+    mean1 = mean(group1);
+    mean2 = mean(group2);
+    
+    std1 = std(group1);
+    std2 = std(group2);
+    
+    n1 = length(group1);
+    n2 = length(group2);
+    
+    pooledStd = sqrt(((n1 - 1) * std1^2 + (n2 - 1) * std2^2) / (n1 + n2 - 2));
+    effectSize = (mean1 - mean2) / pooledStd;
+    
+    disp(['Cohen''s d: ', num2str(effectSize)]);
+    
+    set(gca, 'FontSize', 15);  % Adjust the font size as needed
+    ylabel('log(GSCORR)', 'FontSize', 15);
+    title(' Balloon-Windkessel model','FontSize',15)
+    ylim([-4.5,-1.5])
+    subtitle(['Cohen''s d: ', num2str(effectSize)],"FontSize",15)
 
 % 
 
@@ -473,13 +473,46 @@ effectSize = (mean1 - mean2) / pooledStd;
 disp(['Cohen''s d: ', num2str(effectSize)]);
 
 set(gca, 'FontSize', 15);  % Adjust the font size as needed
-ylabel('log(GSCORR)', 'FontSize', 15);
+ylabel('GSCORR', 'FontSize', 15);
 title(' Balloon-Windkessel model','FontSize',15)
 ylim([-4.5,-1.5])
 subtitle(['Cohen''s d: ', num2str(effectSize)],"FontSize",15)
+%% Plotting 
+% Plotting different values to investigate 
+GSCORR_groups = {'GSCORR_fmri_normal', ...
+    'GSCORR_fmri_normal_dt', ...
+    'GSCORR_fmri_normal_bp',...
+    'GSCORR_fmri_normal_bp_dt',...
+    'GSCORR_fmri_InvScaled' ,...
+    'GSCORR_fmri_InvScaled_dt',...
+    'GSCORR_fmri_InvScaled_bp',...
+    'GSCORR_fmri_InvScaled_bp_dt'} ;
 
+figure;
+set(gcf,'color','w');
 
+for i=1:8   
+transport = eval(GSCORR_groups{i}) ;
+group1 = nanmean(transport(logical(DtiMyelin(:,1)-1),:),1)';
+group2 = nanmean(transport(~logical(DtiMyelin(:,1)-1),:),1)';
+axs = subplot(2,4,i) ; hold on 
+plotEffectSize(group1, group2, GSCORR_groups{i}) ;
 
+end
+
+acw_groups = {'ACW_x_normal', 'ACW_x_InvScaled'} ;
+
+figure;
+set(gcf,'color','w');
+
+for i=1:2   
+transport = eval(acw_groups{i}) ;
+group1 = nanmean(transport(logical(DtiMyelin(:,1)-1),:),1)';
+group2 = nanmean(transport(~logical(DtiMyelin(:,1)-1),:),1)';
+axs = subplot(1,2,i) ; hold on 
+plotEffectSize(group1, group2, acw_groups{i}) ;
+
+end
 
 
 

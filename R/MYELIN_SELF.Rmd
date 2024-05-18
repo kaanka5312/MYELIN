@@ -85,7 +85,9 @@ RegWise$G_1<-factor(RegWise$G_1, levels = c("Self", "Non-Self"))
 
 # 
 test <- readMat("./DATA/MED.mat")
-test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth_detrended.mat")
+#test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth_detrended.mat")
+test2 <- readMat("./DATA/HighLowBandpassedINT_halfwidth_detrended_3.mat")
+
 
 RegWise <- data.frame(MY = test$MED[,3],
                       ACW = rowMeans(test2$ACW0.halfwidth.bp.dt), 
